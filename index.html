@@ -1,0 +1,2025 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>North Star</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  background: #f9f9f9; color: #0a0a0a; min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─ Screens ─ */
+.screen { display:none; min-height:100vh; padding:48px 24px 64px; max-width:520px; margin:0 auto; flex-direction:column; animation:fadeIn .22s ease; }
+.screen.active { display:flex; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+/* ─ Nav ─ */
+.nav { display:flex; align-items:center; justify-content:space-between; margin-bottom:32px; }
+.logo { font-size:15px; font-weight:700; letter-spacing:.3px; cursor:pointer; user-select:none; }
+.nav-right { display:flex; align-items:center; gap:14px; }
+.back-link { font-size:13px; color:#999; cursor:pointer; background:none; border:none; font-family:inherit; padding:4px 0; }
+.back-link:hover { color:#0a0a0a; }
+
+/* ─ Bell ─ */
+.bell-wrap { position:relative; cursor:pointer; padding:4px; }
+.bell-icon  { font-size:19px; line-height:1; }
+.bell-badge { position:absolute; top:-2px; right:-2px; background:#e74c3c; color:#fff; font-size:9px; font-weight:700; min-width:15px; height:15px; border-radius:8px; padding:0 3px; display:none; align-items:center; justify-content:center; }
+.bell-badge.show { display:flex; }
+
+/* ─ Notification Panel ─ */
+.notif-overlay { position:fixed; inset:0; background:rgba(0,0,0,.38); z-index:90; display:none; }
+.notif-overlay.show { display:block; }
+.notif-panel { position:fixed; top:0; right:0; bottom:0; width:310px; max-width:94vw; background:#fff; z-index:100; padding:28px 20px; overflow-y:auto; box-shadow:-4px 0 28px rgba(0,0,0,.12); transform:translateX(100%); transition:transform .25s ease; }
+.notif-panel.open { transform:translateX(0); }
+.notif-ph { display:flex; align-items:center; justify-content:space-between; margin-bottom:22px; }
+.notif-ph-title { font-size:16px; font-weight:600; }
+.notif-close { background:none; border:none; font-size:22px; color:#aaa; cursor:pointer; width:auto; padding:0; margin:0; line-height:1; }
+.notif-close:hover { color:#0a0a0a; opacity:1; }
+.notif-item { display:flex; gap:12px; align-items:flex-start; padding:14px 0; border-bottom:1px solid #f2f2f2; }
+.notif-item:last-of-type { border-bottom:none; }
+.notif-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; margin-top:5px; }
+.notif-dot.tasks     { background:#f39c12; }
+.notif-dot.milestone { background:#8e44ad; }
+.notif-dot.checkin   { background:#27ae60; }
+.notif-body { flex:1; }
+.notif-title { font-size:13px; font-weight:600; margin-bottom:3px; }
+.notif-msg   { font-size:12px; color:#777; line-height:1.4; margin-bottom:8px; }
+.notif-action { font-size:12px; font-weight:600; color:#0a0a0a; cursor:pointer; text-decoration:underline; text-underline-offset:2px; }
+.notif-empty { text-align:center; padding:32px 0; color:#bbb; font-size:14px; }
+.notif-perm-box { background:#f7f7f7; border-radius:10px; padding:14px; margin-top:20px; font-size:13px; color:#555; line-height:1.5; }
+.notif-perm-box button { width:auto; padding:7px 14px; font-size:13px; margin-top:10px; }
+
+/* ─ Typography ─ */
+h1 { font-size:25px; font-weight:700; line-height:1.3; letter-spacing:-.4px; margin-bottom:10px; }
+h2 { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:#aaa; margin-bottom:14px; }
+.subtitle { font-size:15px; color:#777; line-height:1.6; margin-bottom:28px; }
+
+/* ─ Inputs ─ */
+input[type="text"],input[type="password"],input[type="date"],input[type="email"],textarea {
+  width:100%; border:1.5px solid #e4e4e4; border-radius:10px;
+  padding:12px 14px; font-size:15px; font-family:inherit;
+  color:#0a0a0a; background:#fff; outline:none;
+  transition:border-color .15s; resize:none; line-height:1.5;
+}
+input:focus,textarea:focus { border-color:#0a0a0a; }
+textarea { min-height:78px; }
+
+/* ─ Buttons ─ */
+button { background:#0a0a0a; color:#fff; border:none; border-radius:10px; padding:12px 20px; font-size:15px; font-family:inherit; font-weight:500; cursor:pointer; transition:opacity .15s; width:100%; margin-top:10px; }
+button:hover:not(:disabled) { opacity:.8; }
+button:disabled { opacity:.35; cursor:not-allowed; }
+button.ghost { background:transparent; color:#555; border:1.5px solid #e4e4e4; }
+button.ghost:hover:not(:disabled) { border-color:#aaa; color:#0a0a0a; opacity:1; }
+button.sm { width:auto; padding:7px 13px; font-size:13px; margin-top:0; }
+button.icon { width:26px; height:26px; padding:0; border-radius:6px; font-size:13px; margin-top:0; display:inline-flex; align-items:center; justify-content:center; }
+button.text-btn { background:none; color:#c0392b; border:none; width:auto; padding:4px 0; font-size:13px; margin-top:0; }
+button.text-btn:hover { opacity:.65; }
+
+/* ─ NS Card (dark) ─ */
+.ns-card { background:#0a0a0a; color:#fff; border-radius:14px; padding:18px; margin-bottom:22px; }
+.ns-card .card-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:1.2px; opacity:.4; margin-bottom:7px; }
+.ns-card .card-text  { font-size:16px; font-weight:500; line-height:1.45; }
+.ns-card .priority-tag { display:inline-block; background:rgba(255,255,255,.12); border-radius:20px; padding:3px 9px; font-size:11px; font-weight:600; margin-top:10px; }
+
+/* ══════════════════════════════
+   HOME — VISUAL GOAL CARDS
+══════════════════════════════ */
+#screen-home { background:#f9f9f9; }
+.home-header { margin-bottom:28px; }
+.home-greeting { font-size:22px; font-weight:700; letter-spacing:-.4px; }
+.home-sub { font-size:14px; color:#888; margin-top:4px; }
+
+.goal-cards-grid { display:flex; flex-direction:column; gap:14px; }
+
+.goal-card-visual {
+  border-radius:18px; overflow:hidden; cursor:pointer;
+  height:190px; position:relative;
+  box-shadow:0 4px 20px rgba(0,0,0,.1);
+  transition:transform .18s ease, box-shadow .18s ease;
+}
+.goal-card-visual:hover { transform:translateY(-2px); box-shadow:0 8px 28px rgba(0,0,0,.15); }
+
+.gcv-bg {
+  position:absolute; inset:0;
+  background-size:cover; background-position:center;
+  transition:transform .4s ease;
+}
+.goal-card-visual:hover .gcv-bg { transform:scale(1.03); }
+.gcv-overlay {
+  position:absolute; inset:0;
+  background:linear-gradient(175deg, rgba(0,0,0,.15) 0%, rgba(0,0,0,.75) 100%);
+}
+.gcv-content {
+  position:absolute; inset:0;
+  padding:16px; display:flex; flex-direction:column; justify-content:space-between;
+}
+.gcv-top { display:flex; align-items:flex-start; justify-content:space-between; }
+.gcv-priority {
+  background:rgba(255,255,255,.18); backdrop-filter:blur(6px);
+  color:#fff; font-size:11px; font-weight:700;
+  padding:4px 10px; border-radius:20px; letter-spacing:.5px;
+}
+.gcv-reorder { display:flex; gap:4px; }
+.gcv-reorder button { width:26px; height:26px; padding:0; margin:0; border-radius:6px; background:rgba(255,255,255,.18); border:none; color:#fff; font-size:13px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+.gcv-reorder button:hover { background:rgba(255,255,255,.35); opacity:1; }
+.gcv-reorder button:disabled { opacity:.3; }
+
+.gcv-bottom { }
+.gcv-goal-text { color:#fff; font-size:15px; font-weight:600; line-height:1.35; margin-bottom:10px; text-shadow:0 1px 4px rgba(0,0,0,.4); }
+.gcv-stats { display:flex; align-items:center; gap:12px; margin-bottom:8px; }
+.gcv-stat { color:rgba(255,255,255,.8); font-size:11px; font-weight:500; }
+.gcv-task-dots { display:flex; gap:4px; }
+.gcv-task-dot { width:7px; height:7px; border-radius:50%; background:rgba(255,255,255,.35); }
+.gcv-task-dot.done { background:#4ade80; }
+.gcv-progress-bar { height:3px; background:rgba(255,255,255,.2); border-radius:2px; overflow:hidden; }
+.gcv-progress-fill { height:100%; background:rgba(255,255,255,.8); border-radius:2px; transition:width .4s ease; }
+
+/* Gradient backgrounds for goals without images */
+.grad-0 { background:linear-gradient(145deg,#1a1a2e,#0f3460); }
+.grad-1 { background:linear-gradient(145deg,#1b263b,#415a77); }
+.grad-2 { background:linear-gradient(145deg,#1b4332,#2d6a4f); }
+.grad-3 { background:linear-gradient(145deg,#370617,#6a040f); }
+.grad-4 { background:linear-gradient(145deg,#10002b,#3c096c); }
+.grad-5 { background:linear-gradient(145deg,#03045e,#0077b6); }
+
+/* ─ Today focus ─ */
+.focus-box { background:#fff; border-radius:14px; padding:16px; margin-bottom:18px; border:1.5px solid #efefef; }
+.focus-box h2 { margin-bottom:10px; }
+.focus-row { display:flex; gap:10px; align-items:flex-start; padding:7px 0; border-bottom:1px solid #f5f5f5; }
+.focus-row:last-child { border-bottom:none; padding-bottom:2px; }
+.focus-dot { width:6px; height:6px; border-radius:50%; margin-top:8px; flex-shrink:0; }
+.focus-dot.active { background:#0a0a0a; }
+.focus-dot.done-dot { background:#4ade80; }
+.focus-task { font-size:14px; line-height:1.4; }
+.focus-task.done-task { text-decoration:line-through; color:#bbb; }
+.focus-goal-name { font-size:11px; color:#bbb; margin-top:2px; }
+
+/* ─ Sections ─ */
+.section { padding:22px 0; border-top:1px solid #efefef; }
+.section-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+
+/* ─ Vision Board ─ */
+.vision-board { display:flex; gap:10px; overflow-x:auto; padding-bottom:8px; margin-bottom:4px; scrollbar-width:none; }
+.vision-board::-webkit-scrollbar { display:none; }
+.vision-img { position:relative; width:110px; height:110px; flex-shrink:0; border-radius:12px; overflow:hidden; background:#f0f0f0; }
+.vision-img img { width:100%; height:100%; object-fit:cover; display:block; }
+.vision-img .rm-img { position:absolute; top:5px; right:5px; width:20px; height:20px; border-radius:50%; background:rgba(0,0,0,.55); color:#fff; font-size:11px; font-weight:700; border:none; cursor:pointer; padding:0; margin:0; display:flex; align-items:center; justify-content:center; opacity:0; transition:opacity .15s; }
+.vision-img:hover .rm-img { opacity:1; }
+.vision-img .personal-badge { position:absolute; bottom:5px; left:5px; background:rgba(0,0,0,.65); color:#fff; font-size:9px; font-weight:700; padding:2px 6px; border-radius:20px; }
+.vision-img .ai-badge { position:absolute; bottom:5px; left:5px; background:linear-gradient(135deg,#7c3aed,#a855f7); color:#fff; font-size:9px; font-weight:700; padding:2px 6px; border-radius:20px; }
+.vision-add-btn { width:110px; height:110px; flex-shrink:0; border-radius:12px; border:1.5px dashed #ddd; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; gap:5px; background:none; margin-top:0; }
+.vision-add-btn:hover { border-color:#aaa; opacity:1; }
+.vision-add-btn .plus { font-size:22px; color:#ccc; line-height:1; }
+.vision-add-btn .lbl  { font-size:11px; color:#bbb; }
+.vision-self-btn { width:110px; height:110px; flex-shrink:0; border-radius:12px; border:1.5px dashed #c8a0e0; background:none; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:pointer; gap:5px; margin-top:0; }
+.vision-self-btn:hover { border-color:#8e44ad; opacity:1; }
+.vision-self-btn .plus { font-size:22px; color:#c8a0e0; line-height:1; }
+.vision-self-btn .lbl  { font-size:11px; color:#c8a0e0; text-align:center; line-height:1.3; }
+
+/* Loading shimmer for image generation */
+.vision-generating {
+  width:110px; height:110px; flex-shrink:0; border-radius:12px;
+  background:linear-gradient(90deg,#f0f0f0 25%,#e0e0e0 50%,#f0f0f0 75%);
+  background-size:200% 100%;
+  animation:shimmer 1.4s infinite;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:6px;
+}
+@keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+.vision-generating .gen-icon { font-size:24px; animation:spin 2s linear infinite; }
+@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+.vision-generating .gen-lbl { font-size:10px; color:#aaa; font-weight:600; text-align:center; padding:0 6px; }
+
+/* Generator panel */
+.gen-panel {
+  background:#faf8ff; border:1.5px solid #e8deff;
+  border-radius:14px; padding:18px; margin-top:12px;
+  display:none; animation:fadeIn .2s ease;
+}
+.gen-panel.open { display:block; }
+.gen-panel-title { font-size:13px; font-weight:700; margin-bottom:4px; display:flex; align-items:center; gap:8px; }
+.gen-panel-sub { font-size:12px; color:#888; line-height:1.5; margin-bottom:14px; }
+.gen-preview-row { display:flex; gap:10px; align-items:flex-start; margin-bottom:14px; }
+.gen-photo-thumb {
+  width:72px; height:72px; border-radius:10px; flex-shrink:0;
+  background:#f0f0f0; overflow:hidden; border:2px solid #e8deff;
+  display:flex; align-items:center; justify-content:center; font-size:22px; color:#ccc;
+}
+.gen-photo-thumb img { width:100%; height:100%; object-fit:cover; }
+.gen-photo-info { flex:1; }
+.gen-photo-label { font-size:12px; font-weight:600; color:#7c3aed; margin-bottom:4px; }
+.gen-photo-desc  { font-size:12px; color:#888; line-height:1.4; }
+.gen-style-row { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px; }
+.gen-style-chip {
+  padding:5px 12px; border-radius:20px; font-size:12px; font-weight:500;
+  border:1.5px solid #e4e4e4; cursor:pointer; background:#fff;
+  transition:all .15s; color:#555;
+}
+.gen-style-chip.active { background:#7c3aed; color:#fff; border-color:#7c3aed; }
+.gen-prompt-preview {
+  background:#fff; border:1.5px solid #e8deff; border-radius:8px;
+  padding:10px 12px; font-size:12px; color:#555; line-height:1.5;
+  margin-bottom:14px; min-height:48px; display:none;
+}
+.gen-prompt-preview.show { display:block; }
+.gen-prompt-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.8px; color:#a78bfa; margin-bottom:4px; }
+.gen-actions { display:flex; gap:8px; }
+.gen-actions button { flex:1; margin:0; font-size:13px; padding:10px; }
+
+/* Mode toggle */
+.gen-mode-row { display:flex; gap:8px; margin-bottom:16px; }
+.gen-mode-chip { flex:1; text-align:center; padding:8px; border-radius:8px; font-size:13px; font-weight:500; cursor:pointer; border:1.5px solid #e8deff; color:#888; transition:all .15s; }
+.gen-mode-chip.active { background:#7c3aed; color:#fff; border-color:#7c3aed; }
+
+/* fal.ai key section */
+.fal-key-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; }
+.fal-key-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.8px; color:#aaa; }
+.fal-key-why { font-size:11px; color:#a78bfa; cursor:pointer; text-decoration:underline; text-underline-offset:2px; }
+.fal-key-info { font-size:12px; color:#777; line-height:1.5; background:#fff; border:1.5px solid #e8deff; border-radius:8px; padding:10px 12px; display:none; margin-bottom:4px; }
+.fal-key-info.open { display:block; }
+.fal-key-status { font-size:18px; flex-shrink:0; }
+
+/* Powered-by badge */
+.powered-by { display:flex; align-items:center; gap:5px; margin-top:8px; font-size:11px; color:#aaa; }
+.powered-by a { color:#7c3aed; text-decoration:none; font-weight:600; }
+.powered-by a:hover { text-decoration:underline; }
+
+/* ─ Milestones ─ */
+.ms-list { margin-bottom:14px; }
+.ms-item { display:flex; gap:10px; align-items:flex-start; padding:10px 0; border-bottom:1px solid #f5f5f5; }
+.ms-item:last-child { border-bottom:none; }
+.ms-check { width:17px; height:17px; border:1.5px solid #ddd; border-radius:4px; cursor:pointer; flex-shrink:0; margin-top:2px; display:flex; align-items:center; justify-content:center; font-size:10px; transition:all .15s; }
+.ms-check.done { background:#0a0a0a; border-color:#0a0a0a; color:#fff; }
+.ms-body { flex:1; }
+.ms-text { font-size:14px; line-height:1.4; }
+.ms-text.crossed { text-decoration:line-through; color:#bbb; }
+.ms-date { font-size:11px; color:#bbb; margin-top:3px; }
+
+/* ══════════════════════════════
+   TASKS — COMPLETION + ACCOUNTABILITY
+══════════════════════════════ */
+.task-limit-bar { display:flex; align-items:center; gap:8px; margin-bottom:14px; }
+.task-limit-dots { display:flex; gap:4px; }
+.tld { width:8px; height:8px; border-radius:50%; background:#e4e4e4; transition:background .2s; }
+.tld.filled { background:#0a0a0a; }
+.tld.done-filled { background:#4ade80; }
+.task-limit-label { font-size:12px; color:#bbb; }
+
+.task-item { margin-bottom:10px; }
+.task-main-row { display:flex; align-items:center; gap:8px; }
+
+/* Completion circle */
+.task-check-circle {
+  width:22px; height:22px; border-radius:50%;
+  border:2px solid #ddd; flex-shrink:0; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  transition:all .2s; background:#fff;
+}
+.task-check-circle.checked {
+  background:#0a0a0a; border-color:#0a0a0a;
+  animation:checkPop .25s ease;
+}
+.task-check-circle.checked::after { content:'✓'; color:#fff; font-size:11px; font-weight:700; }
+@keyframes checkPop { 0%{transform:scale(.8)} 60%{transform:scale(1.15)} 100%{transform:scale(1)} }
+
+.task-input-wrap { flex:1; position:relative; }
+.task-input-wrap input { padding-right:38px; }
+.task-input-wrap input.task-done-input { text-decoration:line-through; color:#bbb; }
+
+.assign-icon { position:absolute; right:10px; top:50%; transform:translateY(-50%); font-size:15px; cursor:pointer; opacity:.35; transition:opacity .15s; }
+.assign-icon:hover { opacity:.8; }
+.assign-icon.has-assignee { opacity:1; color:#8e44ad; }
+
+/* Assignee panel */
+.assign-panel {
+  background:#faf8ff; border:1.5px solid #e8deff;
+  border-radius:10px; padding:12px; margin-top:6px;
+  display:none;
+  animation:fadeIn .15s ease;
+}
+.assign-panel.open { display:block; }
+.assign-panel-row { display:flex; gap:8px; margin-bottom:8px; }
+.assign-panel-row input { font-size:13px; padding:9px 12px; }
+.assign-panel-actions { display:flex; gap:8px; flex-wrap:wrap; }
+.assign-panel-actions button { width:auto; padding:7px 14px; font-size:13px; margin:0; }
+.assignee-tag { display:inline-flex; align-items:center; gap:5px; background:#f0e8ff; color:#6b21a8; border-radius:20px; padding:3px 10px 3px 8px; font-size:12px; font-weight:600; margin-top:6px; }
+.assignee-tag .rm-tag { cursor:pointer; font-size:14px; color:#a78bfa; line-height:1; margin-left:2px; }
+
+/* Share modal */
+.share-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:200; display:none; align-items:center; justify-content:center; padding:20px; }
+.share-modal-overlay.open { display:flex; }
+.share-modal { background:#fff; border-radius:16px; padding:24px; width:100%; max-width:400px; animation:fadeIn .18s ease; }
+.share-modal h3 { font-size:16px; font-weight:700; margin-bottom:6px; }
+.share-modal p { font-size:13px; color:#777; margin-bottom:16px; }
+.share-msg-box { background:#f7f7f7; border-radius:10px; padding:14px; font-size:13px; line-height:1.6; color:#333; margin-bottom:16px; white-space:pre-wrap; }
+.share-btns { display:flex; gap:8px; flex-wrap:wrap; }
+.share-btns button { width:auto; flex:1; padding:10px; font-size:13px; margin:0; }
+
+/* ══════════════════════════════
+   SMART TASK REVIEW
+══════════════════════════════ */
+.smart-review-panel {
+  background:#fff; border:1.5px solid #efefef;
+  border-radius:14px; padding:16px; margin-top:12px;
+  display:none; animation:fadeIn .2s ease;
+}
+.smart-review-panel.open { display:block; }
+.sr-title { font-size:13px; font-weight:700; margin-bottom:14px; display:flex; align-items:center; gap:8px; }
+.sr-title .sr-badge { background:#f7f7f7; border-radius:6px; padding:2px 8px; font-size:11px; color:#888; font-weight:600; }
+.sr-item { padding:12px 0; border-bottom:1px solid #f5f5f5; }
+.sr-item:last-child { border-bottom:none; }
+.sr-item-top { display:flex; align-items:flex-start; gap:10px; margin-bottom:6px; }
+.sr-action-icon { width:24px; height:24px; border-radius:6px; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:12px; margin-top:1px; }
+.sr-action-icon.keep     { background:#dcfce7; }
+.sr-action-icon.defer    { background:#fef9c3; }
+.sr-action-icon.move     { background:#ede9fe; }
+.sr-action-icon.split    { background:#fce7f3; }
+.sr-item-body { flex:1; }
+.sr-task-text { font-size:13px; font-weight:600; margin-bottom:3px; }
+.sr-reason    { font-size:12px; color:#777; line-height:1.4; }
+.sr-actions   { display:flex; gap:8px; margin-top:8px; }
+.sr-actions button { width:auto; padding:6px 14px; font-size:12px; margin:0; }
+.sr-actions .sr-accept { background:#0a0a0a; }
+.sr-actions .sr-skip   { background:transparent; color:#aaa; border:1.5px solid #e4e4e4; }
+.sr-loading { text-align:center; padding:20px 0; color:#bbb; font-size:14px; }
+
+/* ─ Resources Chat ─ */
+.res-chat { display:flex; flex-direction:column; gap:10px; margin-bottom:14px; }
+.res-msg { padding:11px 14px; border-radius:10px; font-size:14px; line-height:1.55; max-width:90%; word-break:break-word; }
+.res-msg.ai   { background:#f3f3f3; align-self:flex-start; white-space:pre-wrap; }
+.res-msg.user { background:#0a0a0a; color:#fff; align-self:flex-end; }
+.res-input-row { display:flex; gap:8px; align-items:flex-end; }
+.res-input-row textarea { min-height:44px; max-height:120px; padding:10px 13px; font-size:14px; }
+.res-send-btn { width:44px; height:44px; flex-shrink:0; padding:0; margin:0; border-radius:10px; font-size:18px; display:flex; align-items:center; justify-content:center; }
+
+/* ─ Refine chat ─ */
+.chat-area { display:flex; flex-direction:column; gap:12px; margin-bottom:16px; flex:1; }
+.msg { padding:11px 14px; border-radius:10px; font-size:15px; line-height:1.55; max-width:88%; word-break:break-word; }
+.msg.ai   { background:#f3f3f3; align-self:flex-start; }
+.msg.user { background:#0a0a0a; color:#fff; align-self:flex-end; }
+.typing { display:flex; gap:4px; align-items:center; padding:13px 16px; background:#f3f3f3; border-radius:10px; align-self:flex-start; }
+.typing span { width:6px; height:6px; background:#aaa; border-radius:50%; animation:bounce 1.2s infinite ease-in-out; }
+.typing span:nth-child(2) { animation-delay:.2s; }
+.typing span:nth-child(3) { animation-delay:.4s; }
+@keyframes bounce { 0%,60%,100%{transform:translateY(0)} 30%{transform:translateY(-5px)} }
+
+/* ─ Done screen ─ */
+.done-item { display:flex; gap:12px; align-items:flex-start; margin-bottom:12px; }
+.done-num  { font-size:12px; font-weight:600; color:#bbb; padding-top:3px; min-width:14px; }
+.done-text { font-size:15px; line-height:1.4; }
+.done-text.done-crossed { text-decoration:line-through; color:#bbb; }
+.done-check { width:20px; height:20px; border-radius:50%; border:2px solid #ddd; flex-shrink:0; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all .2s; }
+.done-check.checked { background:#0a0a0a; border-color:#0a0a0a; }
+.done-check.checked::after { content:'✓'; color:#fff; font-size:10px; font-weight:700; }
+.alignment-box { background:#f7f7f7; border-radius:10px; padding:16px; font-size:14px; line-height:1.7; color:#444; margin-bottom:24px; }
+
+/* ─ Misc ─ */
+.error  { color:#c0392b; font-size:13px; margin-top:6px; min-height:18px; }
+.muted  { font-size:13px; color:#bbb; }
+.spacer { flex:1; }
+.empty  { text-align:center; padding:36px 0; color:#ccc; font-size:14px; line-height:1.7; }
+.add-row { display:flex; gap:8px; align-items:center; }
+.divider-row { display:flex; justify-content:space-between; align-items:center; padding-top:18px; border-top:1px solid #f0f0f0; margin-top:10px; }
+
+@media(max-width:380px){ h1{font-size:22px} .screen{padding:36px 18px 56px} }
+
+/* ══════════════════════════════
+   PRINT PREVIEW OVERLAY
+══════════════════════════════ */
+#print-overlay {
+  display:none; position:fixed; inset:0; background:#e8e8e8;
+  z-index:300; overflow-y:auto;
+}
+#print-overlay.open { display:block; }
+
+.print-toolbar {
+  position:sticky; top:0; z-index:10;
+  background:#0a0a0a; color:#fff;
+  padding:12px 24px; display:flex;
+  align-items:center; justify-content:space-between;
+  gap:12px;
+}
+.print-toolbar-title { font-size:14px; font-weight:600; letter-spacing:.3px; }
+.print-toolbar-actions { display:flex; gap:8px; }
+.print-toolbar-actions button {
+  width:auto; margin:0; padding:8px 18px;
+  font-size:13px; border-radius:8px;
+}
+.print-toolbar-actions .btn-close {
+  background:transparent; border:1.5px solid rgba(255,255,255,.3); color:#fff;
+}
+.print-toolbar-actions .btn-close:hover { background:rgba(255,255,255,.1); opacity:1; }
+
+/* The actual printable document */
+.print-doc {
+  background:#fff;
+  width:794px; /* A4 width at 96dpi */
+  min-height:1123px;
+  margin:24px auto;
+  padding:56px 64px;
+  box-shadow:0 4px 32px rgba(0,0,0,.15);
+  font-family: Georgia, 'Times New Roman', serif;
+}
+
+.print-doc-header {
+  display:flex; align-items:flex-start; justify-content:space-between;
+  padding-bottom:20px; margin-bottom:32px;
+  border-bottom:2.5px solid #0a0a0a;
+}
+.print-doc-logo { font-size:22px; font-weight:700; letter-spacing:.5px; font-family:-apple-system,sans-serif; }
+.print-doc-logo span { font-size:14px; font-weight:400; color:#888; display:block; margin-top:3px; font-family:-apple-system,sans-serif; }
+.print-doc-meta { text-align:right; font-size:12px; color:#888; font-family:-apple-system,sans-serif; line-height:1.7; }
+.print-doc-meta strong { color:#0a0a0a; display:block; font-size:13px; }
+
+/* Goal block */
+.print-goal-block {
+  margin-bottom:40px;
+  padding-bottom:40px;
+  border-bottom:1px solid #ddd;
+  page-break-inside: avoid;
+}
+.print-goal-block:last-child { border-bottom:none; margin-bottom:0; }
+
+.print-goal-meta {
+  display:flex; align-items:center; gap:10px; margin-bottom:10px;
+}
+.print-priority-badge {
+  background:#0a0a0a; color:#fff;
+  font-size:10px; font-weight:700;
+  letter-spacing:1px; text-transform:uppercase;
+  padding:3px 10px; border-radius:20px;
+  font-family:-apple-system,sans-serif;
+}
+.print-goal-date { font-size:11px; color:#aaa; font-family:-apple-system,sans-serif; }
+
+.print-goal-statement {
+  font-size:19px; font-weight:700; line-height:1.35;
+  color:#0a0a0a; margin-bottom:22px;
+  letter-spacing:-.2px;
+}
+
+.print-section-heading {
+  font-size:10px; font-weight:700; letter-spacing:1.5px;
+  text-transform:uppercase; color:#aaa;
+  font-family:-apple-system,sans-serif;
+  margin-bottom:10px; margin-top:20px;
+}
+
+/* Milestones table */
+.print-ms-table { width:100%; border-collapse:collapse; margin-bottom:4px; }
+.print-ms-table tr { border-bottom:1px solid #f0f0f0; }
+.print-ms-table tr:last-child { border-bottom:none; }
+.print-ms-table td { padding:8px 6px; vertical-align:top; font-family:-apple-system,sans-serif; }
+.ms-col-check { width:22px; font-size:14px; color:#bbb; padding-top:9px !important; }
+.ms-col-check.done { color:#0a0a0a; }
+.ms-col-text { font-size:13px; line-height:1.4; color:#0a0a0a; }
+.ms-col-text.done-text { text-decoration:line-through; color:#bbb; }
+.ms-col-date { width:110px; font-size:11px; color:#888; text-align:right; white-space:nowrap; padding-top:10px !important; }
+.ms-col-bar { width:80px; padding-left:12px !important; }
+.ms-progress { height:4px; background:#f0f0f0; border-radius:2px; margin-top:12px; overflow:hidden; }
+.ms-progress-fill { height:100%; background:#0a0a0a; border-radius:2px; }
+
+/* Today's tasks in print */
+.print-task-row { display:flex; gap:10px; align-items:flex-start; padding:7px 0; border-bottom:1px solid #f5f5f5; font-family:-apple-system,sans-serif; }
+.print-task-row:last-child { border-bottom:none; }
+.print-task-box { font-size:14px; color:#bbb; flex-shrink:0; margin-top:1px; }
+.print-task-box.done { color:#0a0a0a; }
+.print-task-label { font-size:13px; line-height:1.4; flex:1; }
+.print-task-label.done { text-decoration:line-through; color:#bbb; }
+.print-task-assignee { font-size:11px; color:#a78bfa; margin-left:4px; }
+
+/* Notes lines */
+.print-note-line { border-bottom:1px solid #e4e4e4; height:28px; margin-bottom:2px; }
+
+/* Vision image in print */
+.print-vision-img { width:80px; height:80px; object-fit:cover; border-radius:8px; }
+.print-images-row { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:4px; }
+
+/* Footer */
+.print-doc-footer {
+  margin-top:40px; padding-top:16px; border-top:1px solid #eee;
+  font-size:11px; color:#bbb; text-align:center;
+  font-family:-apple-system,sans-serif;
+}
+
+/* ── Media print: show only the document ── */
+@media print {
+  @page { size:A4; margin:15mm 15mm; }
+  body > *:not(#print-overlay) { display:none !important; }
+  #print-overlay { display:block !important; position:static !important; background:#fff !important; overflow:visible !important; }
+  .print-toolbar { display:none !important; }
+  .print-doc { box-shadow:none !important; margin:0 !important; padding:0 !important; width:100% !important; }
+  .print-goal-block { page-break-inside:avoid; }
+}
+</style>
+</head>
+<body>
+
+<!-- Print Overlay -->
+<div id="print-overlay">
+  <div class="print-toolbar">
+    <span class="print-toolbar-title">🖨️ Print Preview</span>
+    <div class="print-toolbar-actions">
+      <button onclick="window.print()">🖨️ Print / Save PDF</button>
+      <button class="btn-close" onclick="closePrint()">✕ Close</button>
+    </div>
+  </div>
+  <div class="print-doc" id="print-doc"></div>
+</div>
+
+<!-- Share Modal -->
+<div class="share-modal-overlay" id="share-modal-overlay" onclick="closeShareModal(event)">
+  <div class="share-modal">
+    <h3>Hold me accountable 💪</h3>
+    <p>Send this to your accountability partner</p>
+    <div class="share-msg-box" id="share-msg-text"></div>
+    <div class="share-btns">
+      <button onclick="copyShareMsg()">📋 Copy</button>
+      <button class="ghost" onclick="emailShareMsg()">✉️ Email</button>
+      <button class="ghost" onclick="whatsappShareMsg()">💬 WhatsApp</button>
+    </div>
+    <button class="ghost" onclick="closeShareModal()" style="margin-top:10px;">Close</button>
+  </div>
+</div>
+
+<!-- Notification Panel -->
+<div class="notif-overlay" id="notif-overlay" onclick="closeNotifPanel()"></div>
+<div class="notif-panel" id="notif-panel">
+  <div class="notif-ph">
+    <span class="notif-ph-title">Notifications</span>
+    <button class="notif-close" onclick="closeNotifPanel()">×</button>
+  </div>
+  <div id="notif-list"></div>
+  <div id="notif-perm-box"></div>
+</div>
+
+<!-- API key screen removed — key lives in server env var -->
+
+<!-- ═══ HOME ═══ -->
+<div class="screen" id="screen-home">
+  <div class="nav">
+    <div class="logo">★ North Star</div>
+    <div class="nav-right">
+      <div class="bell-wrap" onclick="openPrint()" title="Print goals" style="font-size:17px;">🖨️</div>
+      <div class="bell-wrap" onclick="openNotifPanel()">
+        <div class="bell-icon">🔔</div>
+        <div class="bell-badge" id="bell-badge"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="home-header">
+    <div class="home-greeting" id="home-greeting"></div>
+    <div class="home-sub" id="home-sub"></div>
+  </div>
+
+  <div id="today-section"></div>
+
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+    <h2 style="margin:0;">Your Goals</h2>
+    <span class="muted" id="home-date" style="font-size:12px;"></span>
+  </div>
+
+  <div class="goal-cards-grid" id="goal-cards">
+    <div class="empty">No goals yet.<br>Set your first North Star below.</div>
+  </div>
+
+  <div class="spacer"></div>
+  <button onclick="startAddGoal()" style="margin-top:28px;">+ Add New Goal</button>
+</div>
+
+<!-- ═══ WELCOME ═══ -->
+<div class="screen" id="screen-welcome">
+  <div class="nav">
+    <div class="logo" onclick="goHome()">★ North Star</div>
+    <button class="back-link" onclick="goHome()">← Home</button>
+  </div>
+  <h1>What do you want most right now?</h1>
+  <p class="subtitle">Be honest, even if it's vague. We'll sharpen it together.</p>
+  <textarea id="goal-input" placeholder="e.g. get in the best shape of my life…" rows="3"></textarea>
+  <div class="error" id="welcome-error"></div>
+  <button id="welcome-btn" onclick="submitGoal()">Refine this goal →</button>
+</div>
+
+<!-- ═══ REFINE ═══ -->
+<div class="screen" id="screen-refine">
+  <div class="nav">
+    <div class="logo" onclick="goHome()">★ North Star</div>
+    <button class="back-link" onclick="goHome()">← Home</button>
+  </div>
+  <div id="refine-pill" style="display:none;background:#f7f7f7;border-radius:10px;padding:12px 14px;margin-bottom:22px;">
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#bbb;margin-bottom:4px;">Original goal</div>
+    <div id="refine-pill-text" style="font-size:14px;font-weight:500;color:#0a0a0a;"></div>
+  </div>
+  <div class="chat-area" id="chat-area"></div>
+  <div id="answer-area">
+    <textarea id="refine-answer" placeholder="Your answer…" rows="2"></textarea>
+    <div class="error" id="refine-error"></div>
+    <button id="refine-btn" onclick="submitAnswer()">Send</button>
+  </div>
+  <div id="refined-result" style="display:none;">
+    <div class="ns-card"><div class="card-label">Your North Star</div><p class="card-text" id="refined-goal-text"></p></div>
+    <button onclick="confirmGoal()">Add this to my goals →</button>
+    <button class="ghost" onclick="startAddGoal()" style="margin-top:8px;">Try again</button>
+  </div>
+</div>
+
+<!-- ═══ GOAL DETAIL ═══ -->
+<div class="screen" id="screen-goal">
+  <div class="nav">
+    <div class="logo" onclick="goHome()">★ North Star</div>
+    <button class="back-link" onclick="goHome()">← All Goals</button>
+  </div>
+
+  <div class="ns-card">
+    <div class="card-label">North Star</div>
+    <p class="card-text" id="gd-goal-text"></p>
+    <span class="priority-tag" id="gd-priority-tag"></span>
+  </div>
+
+  <!-- Vision Board -->
+  <div class="section" style="border-top:none;padding-top:0;">
+    <div class="section-head">
+      <h2 style="margin:0;">Vision Board</h2>
+      <button class="sm ghost" onclick="toggleGenPanel()" id="gen-panel-btn">✨ Generate Vision</button>
+    </div>
+
+    <!-- AI Generator Panel -->
+    <div class="gen-panel" id="gen-panel">
+      <div class="gen-panel-title">✨ AI Goal Visualiser</div>
+
+      <!-- Mode toggle -->
+      <div class="gen-mode-row" id="gen-mode-row">
+        <div class="gen-mode-chip active" id="mode-photo" onclick="setGenMode('photo')">🪞 Using my photo</div>
+        <div class="gen-mode-chip" id="mode-scene" onclick="setGenMode('scene')">🌅 Goal scene</div>
+      </div>
+
+      <!-- Photo mode panel -->
+      <div id="gen-photo-mode">
+        <div class="gen-preview-row">
+          <div class="gen-photo-thumb" id="gen-photo-thumb">📷</div>
+          <div class="gen-photo-info">
+            <div class="gen-photo-label" id="gen-photo-label">No personal photo yet</div>
+            <div class="gen-photo-desc" id="gen-photo-desc">Upload a photo of yourself (★ Me button above) for a version that actually uses your likeness.</div>
+          </div>
+        </div>
+
+        <!-- fal.ai key input — needed for photo-based img2img -->
+        <div id="fal-key-section">
+          <div class="fal-key-header">
+            <span class="fal-key-label">fal.ai API Key</span>
+            <span class="fal-key-why" onclick="toggleFalInfo()">Why do I need this?</span>
+          </div>
+          <div class="fal-key-info" id="fal-key-info">
+            To keep your face from the photo, we use <strong>fal.ai's FLUX Kontext</strong> model — it does real image-to-image generation. Your Anthropic key can't generate images. Get a free key at <strong>fal.ai</strong> (free credits on sign-up).
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
+            <input type="password" id="fal-key-input" placeholder="your-fal-key…" style="flex:1;font-size:13px;padding:9px 12px;" oninput="saveFalKey(this.value)"/>
+            <div class="fal-key-status" id="fal-key-status"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scene mode note -->
+      <div id="gen-scene-mode" style="display:none;">
+        <div class="gen-panel-sub" style="margin-bottom:0;">AI will generate a vivid scene of someone achieving your goal. No photo needed — uses your free Anthropic key via Pollinations.</div>
+      </div>
+
+      <div style="height:14px;"></div>
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#aaa;margin-bottom:8px;">Visual Style</div>
+      <div class="gen-style-row" id="gen-style-row">
+        <div class="gen-style-chip active" onclick="selectStyle(this,'photorealistic')">📸 Photorealistic</div>
+        <div class="gen-style-chip" onclick="selectStyle(this,'cinematic')">🎬 Cinematic</div>
+        <div class="gen-style-chip" onclick="selectStyle(this,'illustration')">🎨 Illustrated</div>
+        <div class="gen-style-chip" onclick="selectStyle(this,'motivational poster')">💪 Poster</div>
+      </div>
+
+      <div class="gen-prompt-preview" id="gen-prompt-preview">
+        <div class="gen-prompt-label">AI Prompt Preview</div>
+        <div id="gen-prompt-text"></div>
+      </div>
+
+      <div class="gen-actions">
+        <button onclick="generateVisionImage()" id="gen-run-btn">✨ Generate Image</button>
+        <button class="ghost" onclick="previewPrompt()" id="gen-preview-btn">Preview prompt</button>
+      </div>
+      <div class="error" id="gen-error" style="margin-top:8px;"></div>
+    </div>
+
+    <div class="vision-board" id="vision-board"></div>
+    <input type="file" id="img-insp-input" accept="image/*" style="display:none;" onchange="handleImgUpload(event,'inspiration')">
+    <input type="file" id="img-self-input" accept="image/*" style="display:none;" onchange="handleImgUpload(event,'personal')">
+  </div>
+
+  <!-- Milestones -->
+  <div class="section">
+    <div class="section-head">
+      <h2 style="margin:0;">Milestones</h2>
+      <button class="sm ghost" id="ms-ai-btn" onclick="aiMilestones()">✦ Suggest with AI</button>
+    </div>
+    <div class="ms-list" id="ms-list">
+      <p class="muted" style="font-size:13px;padding:4px 0 8px;">No milestones yet — generate with AI or add your own.</p>
+    </div>
+    <div class="add-row">
+      <input type="text" id="new-ms-text" placeholder="Add a milestone…" style="flex:1;"/>
+      <input type="date" id="new-ms-date" style="width:138px;"/>
+      <button class="sm" onclick="addMilestone()" style="width:auto;padding:10px 14px;">Add</button>
+    </div>
+  </div>
+
+  <!-- Today's Tasks -->
+  <div class="section">
+    <div class="section-head">
+      <h2 style="margin:0;">Today's Tasks</h2>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button class="sm ghost" id="smart-review-toggle" onclick="toggleSmartReview()">⚡ Smart Review</button>
+        <button class="sm ghost" id="tasks-ai-btn" onclick="aiTasks()">✦ Suggest</button>
+      </div>
+    </div>
+
+    <!-- Task count indicator -->
+    <div class="task-limit-bar">
+      <div class="task-limit-dots" id="task-limit-dots"></div>
+      <span class="task-limit-label" id="task-limit-label">0 / 5 tasks</span>
+    </div>
+
+    <!-- Task items (up to 5) -->
+    <div id="tasks-container"></div>
+    <button class="sm ghost" id="add-task-btn" onclick="addTaskRow()" style="margin-top:4px;">+ Add task</button>
+
+    <div class="error" id="tasks-error"></div>
+    <button id="lock-btn" onclick="lockTasks()" style="margin-top:14px;">Lock in today's tasks →</button>
+
+    <!-- Smart Review Panel -->
+    <div class="smart-review-panel" id="smart-review-panel">
+      <div class="sr-title">⚡ Smart Review <span class="sr-badge">AI triage</span></div>
+      <div id="sr-content"><div class="sr-loading">Analysing your tasks…</div></div>
+    </div>
+  </div>
+
+  <!-- Resources & Support — Conversational -->
+  <div class="section">
+    <div class="section-head">
+      <h2 style="margin:0;">Resources & Support</h2>
+      <button class="sm ghost" id="res-clear-btn" onclick="clearResources()" style="display:none;">Clear chat</button>
+    </div>
+    <div class="res-chat" id="res-chat"></div>
+    <div class="res-input-row">
+      <textarea id="res-input" placeholder="Ask anything about your goal…" rows="1" oninput="autoResize(this)"></textarea>
+      <button class="res-send-btn" id="res-send-btn" onclick="sendResourceMsg()">↑</button>
+    </div>
+  </div>
+
+  <div class="divider-row">
+    <button class="sm ghost" onclick="goHome()">← All Goals</button>
+    <button class="text-btn" onclick="deleteGoal()">Delete goal</button>
+  </div>
+</div>
+
+<!-- ═══ DONE ═══ -->
+<div class="screen" id="screen-done">
+  <div class="nav">
+    <div class="logo" onclick="goHome()">★ North Star</div>
+    <button class="back-link" onclick="goHome()">← Home</button>
+  </div>
+  <div class="ns-card" style="margin-bottom:28px;">
+    <div class="card-label">North Star</div>
+    <p class="card-text" id="done-goal"></p>
+  </div>
+  <h2 style="margin-bottom:16px;">Today's focus — tap to check off</h2>
+  <div id="done-tasks" style="margin-bottom:20px;"></div>
+  <div class="alignment-box" id="done-alignment"></div>
+  <div class="spacer"></div>
+  <button onclick="goHome()">Back to all goals</button>
+  <button class="ghost" onclick="backToGoal()">← Back to goal</button>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+//  DATA SHAPE
+//  goal: { id, originalGoal, refinedGoal, priority,
+//    milestones:[{id,text,targetDate,completed}],
+//    images:[{id,dataUrl,isPersonal}],
+//    userContext, resChat:[], resPhase:0,
+//    todaysTasks:[{text,completed,assignee:{name,contact}|null}],
+//    tasksDate, createdAt }
+// ═══════════════════════════════════════════
+let goals = [];
+let activeGoalId = null;
+let shareBuffer = { msg:'', contact:'' };
+const R = { original:'', convo:[], qCount:0 };
+const MAX_TASKS = 5;
+
+function load()  { try{goals=JSON.parse(localStorage.getItem('ns_goals')||'[]');}catch(e){goals=[];} }
+function save()  { localStorage.setItem('ns_goals',JSON.stringify(goals)); }
+function get(id) { return goals.find(g=>g.id===id)||null; }
+function patch(id,u){ const i=goals.findIndex(g=>g.id===id); if(i>=0){goals[i]={...goals[i],...u};save();} }
+function uid()   { return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+function today() { return new Date().toISOString().split('T')[0]; }
+
+// ═══════════════════════════════════════════
+//  BOOT
+// ═══════════════════════════════════════════
+function init(){
+  load();
+  renderHome(); show('home');
+  on('goal-input',    'keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();submitGoal();}});
+  on('refine-answer', 'keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();submitAnswer();}});
+  on('res-input',     'keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendResourceMsg();}});
+  scheduleCheckins();
+}
+function on(id,ev,fn){document.getElementById(id).addEventListener(ev,fn);}
+
+// ═══════════════════════════════════════════
+//  NAV
+// ═══════════════════════════════════════════
+function show(name){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById('screen-'+name).classList.add('active');}
+function goHome()    {renderHome();show('home');}
+function backToGoal(){if(activeGoalId){renderGoalDetail(activeGoalId);show('goal');}else goHome();}
+
+// ═══════════════════════════════════════════
+//  AI CALL  — proxied through /api/chat
+// ═══════════════════════════════════════════
+async function ai(messages,system,max=500){
+  const r=await fetch('/api/chat',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({messages,system,max_tokens:max})
+  });
+  if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.error||`Server error ${r.status}`);}
+  return (await r.json()).content[0].text.trim();
+}
+
+// ═══════════════════════════════════════════
+//  NOTIFICATIONS
+// ═══════════════════════════════════════════
+function getNotifications(){
+  const t=today(), notes=[];
+  const seen=JSON.parse(localStorage.getItem('ns_seen_notifs')||'[]');
+  goals.forEach(g=>{
+    if(!g.refinedGoal)return;
+    const label=clip(g.refinedGoal,38);
+    const n1=`tasks-${g.id}-${t}`;
+    if(g.tasksDate!==t&&!seen.includes(n1)) notes.push({id:n1,type:'tasks',title:'Tasks needed',msg:`Set today's tasks for "${label}"`,goalId:g.id});
+    (g.milestones||[]).forEach(m=>{
+      if(!m.completed&&m.targetDate){const d=daysUntil(m.targetDate);if(d>=0&&d<=7){const n2=`ms-${m.id}-${t}`;if(!seen.includes(n2))notes.push({id:n2,type:'milestone',title:`Milestone ${d===0?'due today!':d===1?'due tomorrow':`in ${d} days`}`,msg:clip(m.text,50),goalId:g.id});}}
+    });
+    const hr=new Date().getHours(), n3=`ci-${g.id}-${t}`;
+    if(g.tasksDate===t&&hr>=19&&!seen.includes(n3)) notes.push({id:n3,type:'checkin',title:'Evening check-in',msg:`Mark off completed tasks for "${label}"`,goalId:g.id});
+  });
+  return notes;
+}
+function markSeen(id){const s=JSON.parse(localStorage.getItem('ns_seen_notifs')||'[]');if(!s.includes(id)){s.push(id);localStorage.setItem('ns_seen_notifs',JSON.stringify(s.slice(-200)));}}
+function updateNotifBadge(){const c=getNotifications().length;const b=document.getElementById('bell-badge');b.textContent=c;c>0?b.classList.add('show'):b.classList.remove('show');}
+
+function openNotifPanel(){
+  const notes=getNotifications();
+  document.getElementById('notif-list').innerHTML=notes.length?notes.map(n=>`
+    <div class="notif-item">
+      <div class="notif-dot ${n.type}"></div>
+      <div class="notif-body">
+        <div class="notif-title">${esc(n.title)}</div>
+        <div class="notif-msg">${esc(n.msg)}</div>
+        <span class="notif-action" onclick="notifAction('${n.id}','${n.goalId}')">View goal →</span>
+      </div>
+    </div>`).join(''):'<div class="notif-empty">You\'re all caught up ✓</div>';
+
+  const pb=document.getElementById('notif-perm-box');
+  if('Notification' in window&&Notification.permission==='default') pb.innerHTML=`<div class="notif-perm-box">Enable browser reminders for evening check-ins.<button class="sm" onclick="reqNotifPerm()">Enable</button></div>`;
+  else if(Notification.permission==='granted') pb.innerHTML=`<div class="notif-perm-box" style="color:#27ae60;">✓ Browser notifications on</div>`;
+  else pb.innerHTML='';
+
+  document.getElementById('notif-overlay').classList.add('show');
+  document.getElementById('notif-panel').classList.add('open');
+}
+function closeNotifPanel(){
+  document.getElementById('notif-overlay').classList.remove('show');
+  document.getElementById('notif-panel').classList.remove('open');
+  getNotifications().forEach(n=>markSeen(n.id));
+  setTimeout(updateNotifBadge,300);
+}
+function notifAction(nid,goalId){markSeen(nid);closeNotifPanel();setTimeout(()=>openGoal(goalId),300);}
+async function reqNotifPerm(){const p=await Notification.requestPermission();if(p==='granted')openNotifPanel();}
+function scheduleCheckins(){
+  const now=new Date(),target=new Date();target.setHours(20,0,0,0);
+  if(now<target){setTimeout(()=>{if(Notification.permission==='granted'&&goals.filter(g=>g.tasksDate===today()).length)new Notification('North Star check-in ★',{body:'How did today go? Tap to review your tasks.'});updateNotifBadge();},target-now);}
+  setInterval(updateNotifBadge,5*60*1000);
+  updateNotifBadge();
+}
+
+// ═══════════════════════════════════════════
+//  HOME
+// ═══════════════════════════════════════════
+const GRADIENTS=['linear-gradient(145deg,#1a1a2e,#0f3460)','linear-gradient(145deg,#1b263b,#415a77)','linear-gradient(145deg,#1b4332,#2d6a4f)','linear-gradient(145deg,#370617,#6a040f)','linear-gradient(145deg,#10002b,#3c096c)','linear-gradient(145deg,#03045e,#0077b6)'];
+
+function renderHome(){
+  const t=today();
+  const hr=new Date().getHours();
+  document.getElementById('home-greeting').textContent=hr<12?'Good morning ☀️':hr<17?'Good afternoon 🌤️':'Good evening 🌙';
+  document.getElementById('home-sub').textContent='Focus on what moves you forward.';
+  document.getElementById('home-date').textContent=fmtDate(t);
+  updateNotifBadge();
+
+  // Today's focus
+  const allTasks=[];
+  [...goals].sort((a,b)=>a.priority-b.priority).forEach(g=>{
+    if(g.tasksDate===t&&g.todaysTasks?.length)
+      g.todaysTasks.forEach(tk=>{if(tk.text)allTasks.push({task:tk.text,done:tk.completed||false,goalLabel:clip(g.refinedGoal,40)});});
+  });
+  const sec=document.getElementById('today-section');
+  if(allTasks.length){
+    const doneCount=allTasks.filter(x=>x.done).length;
+    sec.innerHTML=`<div class="focus-box"><h2>Today's Focus — ${doneCount}/${allTasks.length} done</h2>${allTasks.map(x=>`
+      <div class="focus-row">
+        <div class="focus-dot ${x.done?'done-dot':'active'}"></div>
+        <div>
+          <div class="focus-task ${x.done?'done-task':''}">${esc(x.task)}</div>
+          <div class="focus-goal-name">${esc(x.goalLabel)}</div>
+        </div>
+      </div>`).join('')}</div>`;
+  } else sec.innerHTML='';
+
+  // Goal cards
+  const sorted=[...goals].sort((a,b)=>a.priority-b.priority);
+  const el=document.getElementById('goal-cards');
+  if(!sorted.length){el.innerHTML='<div class="empty">No goals yet.<br>Add your first North Star below.</div>';return;}
+
+  el.innerHTML=sorted.map((g,i)=>{
+    const mc=g.milestones?.length||0, md=g.milestones?.filter(m=>m.completed).length||0;
+    const pct=mc?Math.round(md/mc*100):0;
+    const tasks=g.tasksDate===t?(g.todaysTasks||[]):[];
+    const taskDots=tasks.map(tk=>`<div class="gcv-task-dot ${tk.completed?'done':''}"></div>`).join('');
+    const img=g.images?.[0]?.dataUrl;
+    const bgStyle=img?`background-image:url(${img})`:`background:${GRADIENTS[i%GRADIENTS.length]}`;
+    return `<div class="goal-card-visual" onclick="openGoal('${g.id}')">
+      <div class="gcv-bg" style="${bgStyle}"></div>
+      <div class="gcv-overlay"></div>
+      <div class="gcv-content">
+        <div class="gcv-top">
+          <div class="gcv-priority"># ${g.priority}</div>
+          <div class="gcv-reorder">
+            <button onclick="reorder(event,'${g.id}',-1)" ${i===0?'disabled':''} title="Move up">↑</button>
+            <button onclick="reorder(event,'${g.id}',1)"  ${i===sorted.length-1?'disabled':''} title="Move down">↓</button>
+          </div>
+        </div>
+        <div class="gcv-bottom">
+          <div class="gcv-goal-text">${esc(g.refinedGoal)}</div>
+          <div class="gcv-stats">
+            ${mc?`<span class="gcv-stat">${md}/${mc} milestones</span>`:'<span class="gcv-stat">No milestones</span>'}
+            ${tasks.length?`<div class="gcv-task-dots">${taskDots}</div>`:''}
+          </div>
+          ${mc?`<div class="gcv-progress-bar"><div class="gcv-progress-fill" style="width:${pct}%"></div></div>`:''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openGoal(id){activeGoalId=id;renderGoalDetail(id);show('goal');}
+
+function reorder(e,id,dir){
+  e.stopPropagation();
+  const sorted=[...goals].sort((a,b)=>a.priority-b.priority);
+  const i=sorted.findIndex(g=>g.id===id),j=i+dir;
+  if(j<0||j>=sorted.length)return;
+  [sorted[i].priority,sorted[j].priority]=[sorted[j].priority,sorted[i].priority];
+  sorted.forEach(g=>patch(g.id,{priority:g.priority}));
+  renderHome();
+}
+
+// ═══════════════════════════════════════════
+//  ADD GOAL FLOW
+// ═══════════════════════════════════════════
+function startAddGoal(){
+  R.original='';R.convo=[];R.qCount=0;
+  document.getElementById('goal-input').value='';
+  document.getElementById('welcome-error').textContent='';
+  show('welcome');
+}
+
+async function submitGoal(){
+  const raw=document.getElementById('goal-input').value.trim();
+  const err=document.getElementById('welcome-error');
+  if(!raw){err.textContent='Write your goal first.';return;}
+  err.textContent='';
+  const btn=document.getElementById('welcome-btn');
+  btn.disabled=true;btn.textContent='Thinking…';
+  try{
+    R.original=raw;R.convo=[{role:'user',content:`My goal: ${raw}`}];R.qCount=0;
+    document.getElementById('refine-pill-text').textContent=raw;
+    document.getElementById('refine-pill').style.display='block';
+    document.getElementById('chat-area').innerHTML='';
+    document.getElementById('refine-answer').value='';
+    document.getElementById('answer-area').style.display='block';
+    document.getElementById('refined-result').style.display='none';
+    show('refine');
+    await askQ();
+  }catch(e){err.textContent=e.message;}
+  finally{btn.disabled=false;btn.textContent='Refine this goal →';}
+}
+
+async function askQ(){
+  setRefineLoading(true);showTyping('chat-area','typing-ind');
+  const focusMap={
+    0:'what success looks like — specific numbers and measurable outcomes',
+    1:'the exact timeline and deadline',
+    2:'whether they have already started this goal — if yes, what they have done so far and roughly when they started; if no, when they plan to begin'
+  };
+  const total=Object.keys(focusMap).length;
+  const sys=`You are a goal clarity coach. Ask question ${R.qCount+1} of ${total} about the user's goal. Focus: ${focusMap[R.qCount]}. Rules: ONE question, 1–2 short sentences, direct and warm.`;
+  try{
+    const reply=await ai(R.convo,sys,150);
+    R.convo.push({role:'assistant',content:reply});R.qCount++;
+    removeTyping('typing-ind');addChatMsg('chat-area','ai',reply);
+    setRefineLoading(false);document.getElementById('refine-answer').focus();
+  }catch(e){removeTyping('typing-ind');document.getElementById('refine-error').textContent=e.message;setRefineLoading(false);}
+}
+
+async function submitAnswer(){
+  const ans=document.getElementById('refine-answer').value.trim();if(!ans)return;
+  document.getElementById('refine-error').textContent='';
+  addChatMsg('chat-area','user',ans);R.convo.push({role:'user',content:ans});
+  document.getElementById('refine-answer').value='';
+  // Q3 answer (index 2) = start context — capture it before producing the goal
+  if(R.qCount===3) R.startContext=ans;
+  if(R.qCount<3){await askQ();}else{await produceGoal();}
+}
+
+async function produceGoal(){
+  setRefineLoading(true);showTyping('chat-area','typing-ind');
+  const sys=`You are a goal clarity coach. Produce a refined, specific, measurable goal.
+Original: "${R.original}"
+Rules: one sentence, specific and time-bound, use numbers and deadline from the conversation.
+Start with exactly "Your North Star: " then the refined goal.`;
+  try{
+    const reply=await ai(R.convo,sys,180);
+    removeTyping('typing-ind');
+    const m=reply.match(/Your North Star:\s*(.+)/i);
+    document.getElementById('refined-goal-text').textContent=m?m[1].trim():reply.replace(/^Your North Star:\s*/i,'').trim();
+    document.getElementById('answer-area').style.display='none';
+    document.getElementById('refined-result').style.display='block';
+  }catch(e){removeTyping('typing-ind');document.getElementById('refine-error').textContent=e.message;setRefineLoading(false);}
+}
+
+function confirmGoal(){
+  const refined=document.getElementById('refined-goal-text').textContent;
+  const maxP=goals.length?Math.max(...goals.map(g=>g.priority)):0;
+  const g={id:uid(),originalGoal:R.original,refinedGoal:refined,priority:maxP+1,
+    milestones:[],images:[],userContext:'',resChat:[],resPhase:0,
+    todaysTasks:[],tasksDate:'',startContext:R.startContext||'',
+    refinementConvo:R.convo||[],createdAt:today()};
+  goals.push(g);save();
+  activeGoalId=g.id;renderGoalDetail(g.id);show('goal');
+}
+
+// ═══════════════════════════════════════════
+//  GOAL DETAIL
+// ═══════════════════════════════════════════
+function renderGoalDetail(id){
+  const g=get(id);if(!g){goHome();return;}
+  document.getElementById('gd-goal-text').textContent=g.refinedGoal;
+  document.getElementById('gd-priority-tag').textContent=`Priority ${g.priority}`;
+  document.getElementById('smart-review-panel').classList.remove('open');
+  renderVisionBoard(g);renderMilestones(g);renderTasks(g);renderResources(g);
+}
+
+// ── Vision Board ──
+function renderVisionBoard(g){
+  const board=document.getElementById('vision-board');
+  const imgs=g.images||[];
+  board.innerHTML=imgs.map(img=>`
+    <div class="vision-img">
+      <img src="${img.src||img.dataUrl}" alt="" onerror="this.parentElement.style.background='#f0f0f0'">
+      ${img.isPersonal?'<div class="personal-badge">★ Me</div>':''}
+      ${img.isGenerated?'<div class="ai-badge">✨ AI</div>':''}
+      <button class="rm-img" onclick="removeImg('${g.id}','${img.id}')">×</button>
+    </div>`).join('');
+  if(imgs.length<5){
+    board.innerHTML+=`
+      <div class="vision-add-btn" onclick="document.getElementById('img-insp-input').click()">
+        <span class="plus">+</span><span class="lbl">Add image</span>
+      </div>
+      <div class="vision-self-btn" onclick="document.getElementById('img-self-input').click()">
+        <span class="plus">🪞</span><span class="lbl">Add my photo</span>
+      </div>`;
+  }
+  // Refresh generator panel photo state
+  syncGenPanel(g);
+}
+
+async function handleImgUpload(event,type){
+  const file=event.target.files[0];if(!file)return;
+  event.target.value='';
+  const g=get(activeGoalId);if(!g)return;
+  if((g.images||[]).length>=5){alert('Maximum 5 images per goal.');return;}
+  try{
+    const dataUrl=await resizeImg(file,640,.78);
+    patch(activeGoalId,{images:[...(g.images||[]),{id:uid(),dataUrl,isPersonal:type==='personal'}]});
+    renderVisionBoard(get(activeGoalId));renderHome();
+  }catch(e){alert('Could not load image: '+e.message);}
+}
+
+function resizeImg(file,maxPx,q){
+  return new Promise((res,rej)=>{
+    const reader=new FileReader();
+    reader.onload=e=>{const img=new Image();img.onload=()=>{let w=img.width,h=img.height;if(w>maxPx||h>maxPx){if(w>h){h=Math.round(h*maxPx/w);w=maxPx;}else{w=Math.round(w*maxPx/h);h=maxPx;}}const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);res(c.toDataURL('image/jpeg',q));};img.onerror=rej;img.src=e.target.result;};reader.onerror=rej;reader.readAsDataURL(file);
+  });
+}
+
+function removeImg(gid,imgId){
+  const g=get(gid);if(!g)return;
+  patch(gid,{images:(g.images||[]).filter(i=>i.id!==imgId)});
+  renderVisionBoard(get(gid));renderHome();
+}
+
+// ══════════════════════════════════════════
+//  AI VISION GENERATOR
+// ══════════════════════════════════════════
+let selectedStyle='photorealistic';
+let genMode='photo'; // 'photo' | 'scene'
+
+function toggleGenPanel(){
+  const panel=document.getElementById('gen-panel');
+  panel.classList.toggle('open');
+  if(panel.classList.contains('open')){
+    syncGenPanel(get(activeGoalId));
+    document.getElementById('gen-prompt-preview').classList.remove('show');
+    document.getElementById('gen-error').textContent='';
+    // Restore saved fal key
+    const saved=localStorage.getItem('ns_fal_key')||'';
+    const inp=document.getElementById('fal-key-input');
+    if(inp){inp.value=saved;updateFalStatus(saved);}
+  }
+}
+
+function setGenMode(mode){
+  genMode=mode;
+  document.getElementById('mode-photo').classList.toggle('active',mode==='photo');
+  document.getElementById('mode-scene').classList.toggle('active',mode==='scene');
+  document.getElementById('gen-photo-mode').style.display=mode==='photo'?'block':'none';
+  document.getElementById('gen-scene-mode').style.display=mode==='scene'?'block':'none';
+  document.getElementById('gen-prompt-preview').classList.remove('show');
+}
+
+function syncGenPanel(g){
+  if(!g)return;
+  const personal=g.images?.find(i=>i.isPersonal);
+  const thumb=document.getElementById('gen-photo-thumb');
+  const label=document.getElementById('gen-photo-label');
+  const desc=document.getElementById('gen-photo-desc');
+  if(!thumb)return;
+  if(personal){
+    thumb.innerHTML=`<img src="${personal.src||personal.dataUrl}" alt="">`;
+    label.textContent='✓ Photo ready — your face will be used';
+    label.style.color='#7c3aed';
+    desc.textContent='fal.ai FLUX Kontext will keep your actual likeness and place you in the scene of achieving your goal.';
+  } else {
+    thumb.innerHTML='📷';
+    label.textContent='No personal photo uploaded';
+    label.style.color='#aaa';
+    desc.textContent='Upload a photo of yourself (🪞 Add my photo above) to generate a version with your actual face.';
+  }
+  // Auto-switch to scene mode if no photo
+  if(!personal && genMode==='photo') setGenMode('scene');
+  else setGenMode('photo');
+}
+
+function saveFalKey(val){
+  localStorage.setItem('ns_fal_key', val.trim());
+  updateFalStatus(val.trim());
+}
+
+function updateFalStatus(val){
+  const el=document.getElementById('fal-key-status');
+  if(!el)return;
+  el.textContent=val.length>8?'✅':'';
+}
+
+function toggleFalInfo(){
+  document.getElementById('fal-key-info').classList.toggle('open');
+}
+
+function selectStyle(el,style){
+  selectedStyle=style;
+  document.querySelectorAll('.gen-style-chip').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('gen-prompt-preview').classList.remove('show');
+}
+
+// ── Build the text prompt (Claude writes it) ──
+async function buildImagePrompt(g){
+  const styleMap={
+    'photorealistic':'photorealistic, DSLR photography, sharp focus, natural lighting, ultra detailed',
+    'cinematic':'cinematic photography, dramatic golden hour lighting, film grain, anamorphic bokeh',
+    'illustration':'vibrant digital illustration, detailed, concept art, artstation quality',
+    'motivational poster':'bold motivational poster design, high contrast, powerful composition, inspiring'
+  };
+  const styleDesc=styleMap[selectedStyle]||styleMap['photorealistic'];
+
+  if(genMode==='photo'){
+    // Claude Vision reads the photo and writes a prompt describing the person achieving the goal
+    const personal=g.images?.find(i=>i.isPersonal);
+    if(!personal)throw new Error('No personal photo found. Upload one first.');
+
+    const src=personal.src||personal.dataUrl;
+    let imageSource;
+    if(src.startsWith('data:')){
+      const m=src.match(/^data:([^;]+);base64,(.+)$/);
+      if(!m)throw new Error('Invalid image format');
+      imageSource={type:'base64',media_type:m[1],data:m[2]};
+    } else {
+      imageSource={type:'url',url:src};
+    }
+
+    const r=await fetch('/api/chat',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        max_tokens:300,
+        messages:[{role:'user',content:[
+          {type:'image',source:imageSource},
+          {type:'text',text:`The person in this photo has the goal: "${g.refinedGoal}"
+${g.userContext?`About them: ${g.userContext}`:''}
+
+Write a FLUX Kontext image generation prompt that transforms this exact person to show them achieving their goal.
+
+Rules:
+- Start with "The person in the reference image" to anchor to their actual appearance
+- Describe the goal achievement scene vividly (location, action, emotion)
+- Include: ${styleDesc}
+- Be specific about what success looks like for this exact goal
+- Keep it 2–3 sentences, no intro text, prompt only`}
+        ]}]
+      })
+    });
+    if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.error||'Vision API error');}
+    return (await r.json()).content[0].text.trim();
+  } else {
+    // Scene mode: text-only prompt
+    const sys=`Write a concise image generation prompt (max 280 characters) for this goal.
+Goal: "${g.refinedGoal}"
+${g.userContext?`Context: ${g.userContext}`:''}
+Show a person achieving this goal at the peak moment of success.
+Style: ${styleDesc}.
+Return ONLY the prompt — one or two short sentences, no intro, no explanation.`;
+    return await ai([{role:'user',content:'Generate image prompt.'}],sys,220);
+  }
+}
+
+async function previewPrompt(){
+  const g=get(activeGoalId);if(!g)return;
+  const btn=document.getElementById('gen-preview-btn');
+  btn.disabled=true;btn.textContent='Building…';
+  document.getElementById('gen-error').textContent='';
+  try{
+    const prompt=await buildImagePrompt(g);
+    document.getElementById('gen-prompt-text').textContent=prompt;
+    document.getElementById('gen-prompt-preview').classList.add('show');
+  }catch(e){document.getElementById('gen-error').textContent=e.message;}
+  finally{btn.disabled=false;btn.textContent='Preview prompt';}
+}
+
+// ── fal.ai img2img via FLUX Kontext ──
+async function generateWithFalAI(photoSrc, prompt){
+  const falKey=localStorage.getItem('ns_fal_key');
+  if(!falKey)throw new Error('fal.ai key required. Add it above to use your photo.');
+
+  // Submit job to fal.ai queue
+  const submitRes=await fetch('https://queue.fal.run/fal-ai/flux-pro/kontext',{
+    method:'POST',
+    headers:{
+      'Authorization':`Key ${falKey}`,
+      'Content-Type':'application/json'
+    },
+    body:JSON.stringify({
+      image_url: photoSrc,  // data URL or https URL
+      prompt: prompt,
+      num_images:1,
+      guidance_scale:3.5,
+      num_inference_steps:28,
+      output_format:'jpeg'
+    })
+  });
+
+  if(!submitRes.ok){
+    const e=await submitRes.json().catch(()=>({}));
+    throw new Error(e.detail||e.error||`fal.ai error ${submitRes.status}`);
+  }
+
+  const {request_id}=await submitRes.json();
+
+  // Poll for result (up to 90 seconds)
+  const falKey2=localStorage.getItem('ns_fal_key');
+  const pollHeaders={'Authorization':`Key ${falKey2}`};
+  for(let i=0;i<45;i++){
+    await new Promise(r=>setTimeout(r,2000));
+    const statusRes=await fetch(`https://queue.fal.run/fal-ai/flux-pro/kontext/requests/${request_id}/status`,{headers:pollHeaders});
+    const status=await statusRes.json();
+    if(status.status==='COMPLETED'){
+      const resultRes=await fetch(`https://queue.fal.run/fal-ai/flux-pro/kontext/requests/${request_id}`,{headers:pollHeaders});
+      const result=await resultRes.json();
+      const imgUrl=result.images?.[0]?.url;
+      if(!imgUrl)throw new Error('No image returned from fal.ai');
+      return imgUrl;
+    }
+    if(status.status==='FAILED'){
+      throw new Error(status.error||'fal.ai generation failed');
+    }
+  }
+  throw new Error('Generation timed out. Try again.');
+}
+
+// ── Scene image generation via /api/generate-image ──
+async function generateWithPollinations(prompt){
+  const r=await fetch('/api/generate-image',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({prompt})
+  });
+  const data=await r.json();
+  if(!r.ok)throw new Error(data.error||'Scene generation failed. Try again.');
+  return data.dataUrl;
+}
+
+// ── Main generate function ──
+async function generateVisionImage(){
+  const g=get(activeGoalId);if(!g)return;
+  if((g.images||[]).length>=5){document.getElementById('gen-error').textContent='Vision board is full (5 max). Remove an image first.';return;}
+
+  const runBtn=document.getElementById('gen-run-btn');
+  const preBtn=document.getElementById('gen-preview-btn');
+  runBtn.disabled=true;preBtn.disabled=true;
+  document.getElementById('gen-error').textContent='';
+
+  const statusSteps=genMode==='photo'
+    ?['Reading your photo…','Writing goal scene prompt…','Sending to fal.ai…','Generating — this takes ~20–40s…','Almost there…']
+    :['Writing scene prompt…','Generating image…'];
+  let stepIdx=0;
+  runBtn.textContent=statusSteps[0];
+  const stepTimer=setInterval(()=>{
+    stepIdx=Math.min(stepIdx+1,statusSteps.length-1);
+    runBtn.textContent=statusSteps[stepIdx];
+  },8000);
+
+  // Shimmer in the board
+  const board=document.getElementById('vision-board');
+  const shimmer=document.createElement('div');
+  shimmer.className='vision-generating';shimmer.id='gen-shimmer';
+  shimmer.innerHTML='<div class="gen-icon">✨</div><div class="gen-lbl">Creating…</div>';
+  board.prepend(shimmer);
+
+  try{
+    // Step 1: Build prompt with Claude
+    const prompt=await buildImagePrompt(g);
+    document.getElementById('gen-prompt-text').textContent=prompt;
+    document.getElementById('gen-prompt-preview').classList.add('show');
+
+    let imgSrc;
+
+    if(genMode==='photo'){
+      // Step 2a: fal.ai img2img — keeps the person's actual face
+      const personal=g.images?.find(i=>i.isPersonal);
+      if(!personal)throw new Error('Upload a personal photo first.');
+      const photoSrc=personal.src||personal.dataUrl;
+      imgSrc=await generateWithFalAI(photoSrc,prompt);
+    } else {
+      // Step 2b: Pollinations text-to-image — no photo needed
+      imgSrc=await generateWithPollinations(prompt);
+    }
+
+    // Save to goal
+    patch(g.id,{images:[...(g.images||[]),{id:uid(),src:imgSrc,isGenerated:true,isPersonal:false,prompt,genMode}]});
+    renderVisionBoard(get(g.id));
+    renderHome();
+    document.getElementById('gen-panel').classList.remove('open');
+
+  }catch(e){
+    document.getElementById('gen-error').textContent=e.message||'Generation failed. Try again.';
+  }finally{
+    clearInterval(stepTimer);
+    document.getElementById('gen-shimmer')?.remove();
+    runBtn.disabled=false;preBtn.disabled=false;
+    runBtn.textContent='✨ Generate Image';
+  }
+}
+
+// ── Milestones ──
+function renderMilestones(g){
+  const el=document.getElementById('ms-list');
+  if(!g.milestones?.length){el.innerHTML='<p class="muted" style="font-size:13px;padding:4px 0 8px;">No milestones yet — generate with AI or add your own.</p>';return;}
+  el.innerHTML=g.milestones.map(m=>`
+    <div class="ms-item">
+      <div class="ms-check ${m.completed?'done':''}" onclick="toggleMs('${g.id}','${m.id}')">${m.completed?'✓':''}</div>
+      <div class="ms-body">
+        <div class="ms-text ${m.completed?'crossed':''}">${esc(m.text)}</div>
+        ${m.targetDate?`<div class="ms-date">by ${fmtDate(m.targetDate)}</div>`:''}
+      </div>
+      <button class="text-btn" onclick="removeMs('${g.id}','${m.id}')" style="color:#ddd;">✕</button>
+    </div>`).join('');
+}
+
+async function aiMilestones(){
+  const g=get(activeGoalId);if(!g)return;
+  const btn=document.getElementById('ms-ai-btn');btn.disabled=true;btn.textContent='Thinking…';
+  const ctx=g.userContext?`\nUser context: ${g.userContext}`:'';
+
+  // Build a plain-text transcript from the refinement conversation so Claude
+  // knows the exact deadline AND whether the project has already started.
+  let convoSummary='';
+  if(g.refinementConvo?.length){
+    convoSummary='\n\nGoal-setting conversation (use dates and start status from here):\n'+
+      g.refinementConvo
+        .filter(m=>m.role==='user'||m.role==='assistant')
+        .map(m=>`${m.role==='user'?'User':'Coach'}: ${m.content}`)
+        .join('\n');
+  } else if(g.startContext){
+    convoSummary=`\nStart context: "${g.startContext}"`;
+  }
+
+  const sys=`You are a goal planning coach. Suggest 4–5 concrete milestones with accurate target dates.
+Goal: "${g.refinedGoal}"${ctx}${convoSummary}
+
+Rules:
+- Today is ${today()}. Use the conversation above to find the real deadline and whether work has started.
+- If the project is already in progress, the first milestone(s) should reflect progress already made (dates may be in the past or very near).
+- Space remaining milestones evenly between today and the deadline from the conversation.
+- Do NOT invent a deadline — use the one stated by the user.
+Return ONLY a valid JSON array:
+[{"text":"description","targetDate":"YYYY-MM-DD"},...]`;
+  try{
+    const reply=await ai([{role:'user',content:'Suggest milestones.'}],sys,700);
+    const jm=reply.match(/\[[\s\S]*\]/);if(!jm)throw new Error('Could not parse');
+    const items=JSON.parse(jm[0]);
+    patch(g.id,{milestones:[...(g.milestones||[]),...items.map(x=>({id:uid(),text:x.text,targetDate:x.targetDate||'',completed:false}))]});
+    renderMilestones(get(g.id));
+  }catch(e){alert('Could not generate milestones: '+e.message);}
+  finally{btn.disabled=false;btn.textContent='✦ Suggest with AI';}
+}
+
+function addMilestone(){
+  const text=document.getElementById('new-ms-text').value.trim();if(!text)return;
+  const date=document.getElementById('new-ms-date').value;
+  const g=get(activeGoalId);if(!g)return;
+  patch(g.id,{milestones:[...(g.milestones||[]),{id:uid(),text,targetDate:date,completed:false}]});
+  document.getElementById('new-ms-text').value='';document.getElementById('new-ms-date').value='';
+  renderMilestones(get(activeGoalId));
+}
+
+function toggleMs(gid,mid){
+  const g=get(gid);if(!g)return;
+  patch(gid,{milestones:g.milestones.map(m=>m.id===mid?{...m,completed:!m.completed}:m)});
+  renderMilestones(get(gid));
+}
+function removeMs(gid,mid){
+  const g=get(gid);if(!g)return;
+  patch(gid,{milestones:g.milestones.filter(m=>m.id!==mid)});
+  renderMilestones(get(gid));
+}
+
+// ═══════════════════════════════════════════
+//  TASKS  (up to 5, completion, accountability)
+// ═══════════════════════════════════════════
+let taskRows = [];   // [{text, completed, assignee}]
+
+function renderTasks(g){
+  const t=today();
+  const saved=g.tasksDate===t?(g.todaysTasks||[]):[];
+  taskRows=saved.length?saved.map(tk=>({...tk})):[{text:'',completed:false,assignee:null}];
+  rebuildTaskUI();
+}
+
+function rebuildTaskUI(){
+  const container=document.getElementById('tasks-container');
+  container.innerHTML='';
+  taskRows.forEach((_,i)=>container.appendChild(buildTaskRow(i)));
+  updateTaskLimitBar();
+  const addBtn=document.getElementById('add-task-btn');
+  addBtn.style.display=taskRows.length>=MAX_TASKS?'none':'inline-flex';
+}
+
+function buildTaskRow(i){
+  const tk=taskRows[i];
+  const wrap=document.createElement('div');
+  wrap.className='task-item';
+  wrap.id=`task-item-${i}`;
+
+  const assigneeTag=tk.assignee?
+    `<div class="assignee-tag"><span>👤 ${esc(tk.assignee.name)}</span><span class="rm-tag" onclick="removeAssignee(${i})">×</span></div>`:'';
+
+  wrap.innerHTML=`
+    <div class="task-main-row">
+      <div class="task-check-circle ${tk.completed?'checked':''}" id="tcc-${i}" onclick="toggleTaskCheck(${i})"></div>
+      <div class="task-input-wrap">
+        <input type="text" id="gd-t${i}" class="${tk.completed?'task-done-input':''}"
+          placeholder="Task ${i+1}…" value="${esc(tk.text)}"
+          oninput="taskRows[${i}].text=this.value;updateTaskLimitBar()"
+          ${tk.completed?'disabled':''}/>
+        <span class="assign-icon ${tk.assignee?'has-assignee':''}" onclick="toggleAssignPanel(${i})" title="Assign to friend">👤</span>
+      </div>
+      ${i>0?`<button class="icon ghost" onclick="removeTaskRow(${i})" style="flex-shrink:0;">✕</button>`:''}
+    </div>
+    ${assigneeTag}
+    <div class="assign-panel" id="ap-${i}">
+      <div class="assign-panel-row">
+        <input type="text"  id="ap-name-${i}"    placeholder="Friend's name"  value="${tk.assignee?.name||''}"/>
+        <input type="text"  id="ap-contact-${i}" placeholder="Email or WhatsApp" value="${tk.assignee?.contact||''}"/>
+      </div>
+      <div class="assign-panel-actions">
+        <button class="sm" onclick="saveAssignee(${i})">Assign</button>
+        <button class="sm ghost" onclick="openShareModal(${i})">Share message</button>
+        <button class="sm ghost" onclick="toggleAssignPanel(${i})">Cancel</button>
+      </div>
+    </div>`;
+  return wrap;
+}
+
+function addTaskRow(){
+  if(taskRows.length>=MAX_TASKS)return;
+  taskRows.push({text:'',completed:false,assignee:null});
+  rebuildTaskUI();
+  setTimeout(()=>document.getElementById(`gd-t${taskRows.length-1}`)?.focus(),50);
+}
+
+function removeTaskRow(i){
+  taskRows.splice(i,1);
+  rebuildTaskUI();
+}
+
+function toggleTaskCheck(i){
+  if(!taskRows[i].text)return;
+  taskRows[i].completed=!taskRows[i].completed;
+  // Save immediately
+  const g=get(activeGoalId);if(!g)return;
+  patch(activeGoalId,{todaysTasks:[...taskRows]});
+  // Update circle
+  const circle=document.getElementById(`tcc-${i}`);
+  const input=document.getElementById(`gd-t${i}`);
+  if(circle){circle.classList.toggle('checked',taskRows[i].completed);}
+  if(input){input.classList.toggle('task-done-input',taskRows[i].completed);input.disabled=taskRows[i].completed;}
+  updateTaskLimitBar();
+  updateNotifBadge();
+  renderHome();
+}
+
+function updateTaskLimitBar(){
+  const filled=taskRows.filter(t=>t.text.trim()).length;
+  const done=taskRows.filter(t=>t.completed).length;
+  const dots=document.getElementById('task-limit-dots');
+  const label=document.getElementById('task-limit-label');
+  if(dots){
+    dots.innerHTML=Array.from({length:MAX_TASKS},(_,i)=>{
+      const hasTxt=i<filled;
+      const isDone=taskRows[i]?.completed&&taskRows[i]?.text;
+      return `<div class="tld ${isDone?'done-filled':hasTxt?'filled':''}"></div>`;
+    }).join('');
+  }
+  if(label) label.textContent=`${done} done · ${filled} / ${MAX_TASKS} tasks`;
+}
+
+// ── Accountability ──
+function toggleAssignPanel(i){
+  const panel=document.getElementById(`ap-${i}`);
+  if(panel) panel.classList.toggle('open');
+}
+
+function saveAssignee(i){
+  const name=document.getElementById(`ap-name-${i}`)?.value.trim();
+  const contact=document.getElementById(`ap-contact-${i}`)?.value.trim();
+  if(!name)return;
+  taskRows[i].assignee={name,contact};
+  const g=get(activeGoalId);if(g) patch(activeGoalId,{todaysTasks:[...taskRows]});
+  rebuildTaskUI();
+}
+
+function removeAssignee(i){
+  taskRows[i].assignee=null;
+  const g=get(activeGoalId);if(g) patch(activeGoalId,{todaysTasks:[...taskRows]});
+  rebuildTaskUI();
+}
+
+function openShareModal(i){
+  const tk=taskRows[i];
+  const g=get(activeGoalId);
+  const name=document.getElementById(`ap-name-${i}`)?.value||tk.assignee?.name||'friend';
+  const taskText=document.getElementById(`gd-t${i}`)?.value||tk.text||'my task';
+  const goal=g?.refinedGoal||'my goal';
+  const msg=`Hey ${name}! 💪\n\nI'm holding myself accountable today and I want you to know about it.\n\nI've committed to: "${taskText}"\n\nThis is part of my goal: ${goal}\n\nI'll update you when it's done. Hold me to it! ⭐`;
+  shareBuffer={msg, contact:tk.assignee?.contact||''};
+  document.getElementById('share-msg-text').textContent=msg;
+  document.getElementById('share-modal-overlay').classList.add('open');
+}
+
+function closeShareModal(e){
+  if(e&&e.target!==document.getElementById('share-modal-overlay')&&!e.target.closest('.share-modal')===false)return;
+  document.getElementById('share-modal-overlay').classList.remove('open');
+}
+
+async function copyShareMsg(){
+  await navigator.clipboard.writeText(shareBuffer.msg).catch(()=>{});
+  const btn=event.target;btn.textContent='✓ Copied!';setTimeout(()=>btn.textContent='📋 Copy',1500);
+}
+
+function emailShareMsg(){
+  const sub=encodeURIComponent('Holding me accountable ★');
+  const body=encodeURIComponent(shareBuffer.msg);
+  const to=shareBuffer.contact.includes('@')?shareBuffer.contact:'';
+  window.open(`mailto:${to}?subject=${sub}&body=${body}`);
+}
+
+function whatsappShareMsg(){
+  window.open('https://wa.me/?text='+encodeURIComponent(shareBuffer.msg));
+}
+
+// ── AI Task Suggestions ──
+async function aiTasks(){
+  const g=get(activeGoalId);if(!g)return;
+  const btn=document.getElementById('tasks-ai-btn');btn.disabled=true;btn.textContent='Thinking…';
+  const nextMs=g.milestones?.find(m=>!m.completed);
+  const msCtx=nextMs?`Active milestone: "${nextMs.text}"${nextMs.targetDate?` (due ${nextMs.targetDate})`:''}` : 'No milestones defined.';
+  const ctx=g.userContext?`\nUser context: ${g.userContext}`:'';
+  const sys=`You are a daily focus coach. Suggest exactly 5 concrete tasks for today.
+North Star: "${g.refinedGoal}"
+${msCtx}${ctx}
+Today: ${today()}
+Return ONLY a JSON array of exactly 5 strings: ["task one","task two","task three","task four","task five"]
+Tasks must be specific, completable today, directly advancing the milestone.`;
+  try{
+    const reply=await ai([{role:'user',content:'Suggest tasks.'}],sys,400);
+    const jm=reply.match(/\[[\s\S]*\]/);if(!jm)throw new Error('Could not parse tasks');
+    const suggested=JSON.parse(jm[0]).slice(0,MAX_TASKS);
+    taskRows=suggested.map(t=>({text:t,completed:false,assignee:null}));
+    rebuildTaskUI();
+  }catch(e){document.getElementById('tasks-error').textContent='Could not suggest: '+e.message;}
+  finally{btn.disabled=false;btn.textContent='✦ Suggest';}
+}
+
+// ── Lock Tasks ──
+async function lockTasks(){
+  const filled=taskRows.filter(t=>t.text.trim());
+  const err=document.getElementById('tasks-error');
+  if(!filled.length){err.textContent='Please add at least one task.';return;}
+  if(filled.length>MAX_TASKS){err.textContent=`Max ${MAX_TASKS} tasks allowed.`;return;}
+  err.textContent='';
+  const btn=document.getElementById('lock-btn');btn.disabled=true;btn.textContent='Checking alignment…';
+  const g=get(activeGoalId);if(!g)return;
+  patch(g.id,{todaysTasks:[...taskRows],tasksDate:today()});
+
+  const ctx=g.userContext?`\nUser context: ${g.userContext}`:'';
+  const taskList=filled.map((tk,i)=>`${i+1}. ${tk.text}`).join('\n');
+  const sys=`You are a focus coach reviewing daily tasks against a North Star goal.
+North Star: "${g.refinedGoal}"${ctx}
+Today's tasks:\n${taskList}
+Write a 2–3 sentence honest assessment. Affirm if connected; gently note if off.
+End with one short encouraging line. Warm, specific, no generic fluff.`;
+  try{
+    const alignment=await ai([{role:'user',content:'Assess alignment.'}],sys,320);
+    document.getElementById('done-goal').textContent=g.refinedGoal;
+    document.getElementById('done-alignment').textContent=alignment;
+    renderDoneTasks();
+    updateNotifBadge();
+    show('done');
+  }catch(e){err.textContent=e.message;btn.disabled=false;btn.textContent="Lock in today's tasks →";}
+}
+
+function renderDoneTasks(){
+  const g=get(activeGoalId);if(!g)return;
+  const tasks=g.todaysTasks||[];
+  document.getElementById('done-tasks').innerHTML=tasks.map((tk,i)=>`
+    <div class="done-item">
+      <div class="done-check ${tk.completed?'checked':''}" id="dc-${i}" onclick="toggleDoneCheck(${i})"></div>
+      <div>
+        <div class="done-text ${tk.completed?'done-crossed':''}" id="dt-${i}">${esc(tk.text)}</div>
+        ${tk.assignee?`<div style="font-size:11px;color:#a78bfa;margin-top:3px;">👤 ${esc(tk.assignee.name)}</div>`:''}
+      </div>
+    </div>`).join('');
+}
+
+function toggleDoneCheck(i){
+  const g=get(activeGoalId);if(!g)return;
+  const tasks=[...(g.todaysTasks||[])];
+  if(!tasks[i])return;
+  tasks[i]={...tasks[i],completed:!tasks[i].completed};
+  patch(activeGoalId,{todaysTasks:tasks});
+  taskRows=tasks;
+  const dc=document.getElementById(`dc-${i}`);
+  const dt=document.getElementById(`dt-${i}`);
+  if(dc)dc.classList.toggle('checked',tasks[i].completed);
+  if(dt)dt.classList.toggle('done-crossed',tasks[i].completed);
+  updateNotifBadge();renderHome();
+}
+
+// ═══════════════════════════════════════════
+//  SMART TASK REVIEW
+// ═══════════════════════════════════════════
+let smartSuggestions=[];
+
+async function toggleSmartReview(){
+  const panel=document.getElementById('smart-review-panel');
+  if(panel.classList.contains('open')){panel.classList.remove('open');return;}
+  const filled=taskRows.filter(t=>t.text.trim());
+  if(!filled.length){document.getElementById('tasks-error').textContent='Add some tasks first, then run Smart Review.';return;}
+  panel.classList.add('open');
+  document.getElementById('sr-content').innerHTML='<div class="sr-loading">Analysing your tasks…</div>';
+
+  const g=get(activeGoalId);if(!g)return;
+  const nextMs=g.milestones?.find(m=>!m.completed);
+  const otherGoals=goals.filter(x=>x.id!==activeGoalId).map(x=>({id:x.id,goal:x.refinedGoal}));
+  const ctx=g.userContext?`\nUser context: ${g.userContext}`:'';
+
+  const sys=`You are a smart task triage coach. Review today's tasks against the goal and milestone.
+North Star: "${g.refinedGoal}"
+Active milestone: ${nextMs?`"${nextMs.text}"`:'none'}${ctx}
+Other goals: ${otherGoals.map(x=>`"${x.goal}"`).join(', ')||'none'}
+
+For each task, return one of these actions:
+- "keep": task is important and directly advances the goal today
+- "defer": task can move to tomorrow without losing momentum (explain why)
+- "move": task belongs to a different goal (name which one)
+- "split": task is too big for one day (suggest two smaller subtasks)
+
+Return ONLY valid JSON:
+[{"taskIndex":0,"action":"keep","reason":"brief reason","subtasks":null,"moveToGoal":null},...]
+One object per task. Be honest and direct.`;
+
+  const taskList=filled.map((tk,i)=>({role:'user',content:`Task ${i}: "${tk.text}"`}));
+  try{
+    const reply=await ai([{role:'user',content:'Review these tasks:\n'+filled.map((t,i)=>`${i}: "${t.text}"`).join('\n')}],sys,800);
+    const jm=reply.match(/\[[\s\S]*\]/);
+    if(!jm)throw new Error('Could not parse');
+    smartSuggestions=JSON.parse(jm[0]);
+    renderSmartReview(filled);
+  }catch(e){document.getElementById('sr-content').innerHTML=`<div class="sr-loading" style="color:#c0392b;">${e.message}</div>`;}
+}
+
+const SR_ICONS={keep:'✅',defer:'⏭️',move:'↗️',split:'✂️'};
+
+function renderSmartReview(filled){
+  const srEl=document.getElementById('sr-content');
+  if(!smartSuggestions.length){srEl.innerHTML='<div class="sr-loading">All tasks look good!</div>';return;}
+  srEl.innerHTML=smartSuggestions.map((s,si)=>{
+    const tk=filled[s.taskIndex];if(!tk)return'';
+    const icon=SR_ICONS[s.action]||'•';
+    let actionHtml='';
+    if(s.action==='defer')  actionHtml=`<button class="sm sr-accept" onclick="applySR(${si},'defer')">Defer to tomorrow</button>`;
+    if(s.action==='move')   actionHtml=`<button class="sm sr-accept" onclick="applySR(${si},'move')">Move to other goal</button>`;
+    if(s.action==='split')  actionHtml=`<button class="sm sr-accept" onclick="applySR(${si},'split')">Split task</button>`;
+    return `<div class="sr-item" id="sr-item-${si}">
+      <div class="sr-item-top">
+        <div class="sr-action-icon ${s.action}">${icon}</div>
+        <div class="sr-item-body">
+          <div class="sr-task-text">"${esc(tk.text)}"</div>
+          <div class="sr-reason">${esc(s.reason)}${s.moveToGoal?` → <em>${esc(s.moveToGoal)}</em>`:''}</div>
+        </div>
+      </div>
+      ${s.action!=='keep'?`<div class="sr-actions">${actionHtml}<button class="sm sr-skip" onclick="dismissSR(${si})">Keep anyway</button></div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function applySR(si,action){
+  const s=smartSuggestions[si];
+  const realIdx=s.taskIndex;
+  if(action==='defer'){
+    // Remove task from today's list
+    taskRows.splice(realIdx,1);
+    // Adjust all subsequent suggestions
+    smartSuggestions.forEach(x=>{if(x.taskIndex>realIdx)x.taskIndex--;});
+  }
+  if(action==='move'){
+    // Remove from current, mark as suggestion for target goal if possible
+    const moved=taskRows.splice(realIdx,1)[0];
+    smartSuggestions.forEach(x=>{if(x.taskIndex>realIdx)x.taskIndex--;});
+    const target=goals.find(g=>g.id!==activeGoalId&&s.moveToGoal&&g.refinedGoal.toLowerCase().includes(s.moveToGoal.toLowerCase().slice(0,15)));
+    if(target){
+      const existing=target.todaysTasks||[];
+      if(existing.length<MAX_TASKS){patch(target.id,{todaysTasks:[...existing,{text:moved.text,completed:false,assignee:null}]});}
+    }
+  }
+  if(action==='split'&&s.subtasks?.length>=2){
+    taskRows.splice(realIdx,1,...s.subtasks.slice(0,2).map(t=>({text:t,completed:false,assignee:null})));
+    smartSuggestions.forEach(x=>{if(x.taskIndex>realIdx)x.taskIndex+=1;});
+  }
+  document.getElementById(`sr-item-${si}`)?.remove();
+  rebuildTaskUI();
+}
+
+function dismissSR(si){document.getElementById(`sr-item-${si}`)?.remove();}
+
+// ═══════════════════════════════════════════
+//  RESOURCES — CONVERSATIONAL
+// ═══════════════════════════════════════════
+function renderResources(g){
+  const chat=document.getElementById('res-chat');
+  const clearBtn=document.getElementById('res-clear-btn');
+  const msgs=g.resChat||[];
+  chat.innerHTML='';msgs.forEach(m=>appendResMsg(m.role,m.content));
+  clearBtn.style.display=msgs.length?'block':'none';
+  if(!msgs.length)startResourceChat(g);
+}
+
+async function startResourceChat(g){
+  const sys=buildResSys(g,0);appendResTyping();
+  try{
+    const reply=await ai([{role:'user',content:"I'd like help with resources for my goal."}],sys,250);
+    removeResTyping();
+    const msgs=[{role:'assistant',content:reply}];
+    patch(g.id,{resChat:msgs,resPhase:1});
+    appendResMsg('ai',reply);
+    document.getElementById('res-clear-btn').style.display='block';
+  }catch(e){removeResTyping();appendResMsg('ai','Sorry, could not start. Check your API key.');}
+}
+
+async function sendResourceMsg(){
+  const inp=document.getElementById('res-input');
+  const text=inp.value.trim();if(!text)return;
+  const g=get(activeGoalId);if(!g)return;
+  inp.value='';autoResize(inp);
+  setResLoading(true);
+  const msgs=[...(g.resChat||[]),{role:'user',content:text}];
+  patch(g.id,{resChat:msgs});appendResMsg('user',text);appendResTyping();
+  const phase=g.resPhase||0, nextPhase=phase<3?phase+1:3;
+  const sys=buildResSys(g,phase);
+  try{
+    const reply=await ai(msgs,sys,800);removeResTyping();
+    const updatedMsgs=[...msgs,{role:'assistant',content:reply}];
+    if(phase===2){
+      const ctx=await extractContext(g,updatedMsgs);
+      patch(g.id,{resChat:updatedMsgs,resPhase:nextPhase,userContext:ctx});
+    } else {
+      patch(g.id,{resChat:updatedMsgs,resPhase:nextPhase});
+    }
+    appendResMsg('ai',reply);
+  }catch(e){removeResTyping();appendResMsg('ai','Error: '+e.message);}
+  finally{setResLoading(false);}
+}
+
+async function extractContext(g,msgs){
+  const sys=`Summarise in 2–3 sentences what you now know about this person's situation, experience level, constraints, and resources. Factual and compact — used in other AI prompts.`;
+  try{return await ai(msgs,sys,200);}catch(e){return '';}
+}
+
+function buildResSys(g,phase){
+  const goal=g.refinedGoal, ctx=g.userContext?`\nKnown context: ${g.userContext}`:'';
+  const msList=(g.milestones||[]).map(m=>m.text).join('; ')||'none';
+  if(phase===0) return `You are a warm goal achievement advisor. Goal: "${goal}" Milestones: ${msList}\nAsk ONE question about their CURRENT SITUATION — baseline, experience level, what they've tried. Conversational. 2 sentences max.`;
+  if(phase===1) return `You are a warm goal advisor. Goal: "${goal}" Milestones: ${msList}${ctx}\nAsk ONE question about RESOURCES AND CONSTRAINTS — time, budget, obstacles. 2 sentences max.`;
+  if(phase===2) return `You are a knowledgeable goal advisor. Goal: "${goal}" Milestones: ${msList}${ctx}\nProvide personalised recommendations:\n\nTOOLS & RESOURCES\n3–4 specific tools suited to their situation.\n\nPEOPLE & SUPPORT\nCommunities, coaches, or mentors for their context.\n\nQUICK WINS (Next 48 Hours)\n2–3 immediate actions.\n\nPOTENTIAL BLOCKERS\n2–3 obstacles specific to them and strategies.\n\nEnd by inviting follow-up questions.`;
+  return `You are a knowledgeable goal achievement advisor. Goal: "${goal}" Milestones: ${msList}${ctx}\nContinue naturally. Give specific, actionable advice tailored to this person. If relevant, suggest milestones or daily task adjustments.`;
+}
+
+function clearResources(){
+  const g=get(activeGoalId);if(!g)return;
+  if(!confirm('Clear the resources conversation? This will restart it.'))return;
+  patch(activeGoalId,{resChat:[],resPhase:0,userContext:''});
+  document.getElementById('res-chat').innerHTML='';
+  document.getElementById('res-clear-btn').style.display='none';
+  startResourceChat(get(activeGoalId));
+}
+
+function appendResMsg(role,text){const chat=document.getElementById('res-chat');const d=document.createElement('div');d.className='res-msg '+role;d.textContent=text;chat.appendChild(d);d.scrollIntoView({behavior:'smooth',block:'nearest'});}
+function appendResTyping(){const chat=document.getElementById('res-chat');const d=document.createElement('div');d.id='res-typing';d.className='typing';d.innerHTML='<span></span><span></span><span></span>';chat.appendChild(d);d.scrollIntoView({behavior:'smooth',block:'nearest'});}
+function removeResTyping(){document.getElementById('res-typing')?.remove();}
+function setResLoading(on){const btn=document.getElementById('res-send-btn'),inp=document.getElementById('res-input');btn.disabled=on;inp.disabled=on;}
+
+// ── Delete goal ──
+function deleteGoal(){
+  const g=get(activeGoalId);if(!g)return;
+  if(!confirm(`Delete "${clip(g.refinedGoal,55)}"?\nThis can't be undone.`))return;
+  goals=goals.filter(x=>x.id!==activeGoalId);
+  [...goals].sort((a,b)=>a.priority-b.priority).forEach((g,i)=>patch(g.id,{priority:i+1}));
+  activeGoalId=null;renderHome();show('home');
+}
+
+// ═══════════════════════════════════════════
+//  REFINE HELPERS
+// ═══════════════════════════════════════════
+function addChatMsg(areaId,role,text){const a=document.getElementById(areaId);const d=document.createElement('div');d.className='msg '+role;d.textContent=text;a.appendChild(d);d.scrollIntoView({behavior:'smooth',block:'nearest'});}
+function showTyping(areaId,tid){const a=document.getElementById(areaId);const d=document.createElement('div');d.id=tid;d.className='typing';d.innerHTML='<span></span><span></span><span></span>';a.appendChild(d);d.scrollIntoView({behavior:'smooth',block:'nearest'});}
+function removeTyping(id){document.getElementById(id)?.remove();}
+function setRefineLoading(on){const btn=document.getElementById('refine-btn'),inp=document.getElementById('refine-answer');btn.disabled=on;inp.disabled=on;btn.textContent=on?'Thinking…':'Send';}
+
+// ═══════════════════════════════════════════
+//  UTILS
+// ═══════════════════════════════════════════
+function esc(s){const d=document.createElement('div');d.appendChild(document.createTextNode(s));return d.innerHTML;}
+function clip(s,n){return s.length>n?s.slice(0,n)+'…':s;}
+function fmtDate(iso){if(!iso)return'';return new Date(iso+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});}
+function fmtDateLong(iso){if(!iso)return'';return new Date(iso+'T12:00:00').toLocaleDateString('en-US',{day:'numeric',month:'long',year:'numeric'});}
+function daysUntil(iso){const d=new Date(iso+'T12:00:00'),now=new Date();return Math.round((d-now)/(1000*60*60*24));}
+function autoResize(el){el.style.height='auto';el.style.height=Math.min(el.scrollHeight,120)+'px';}
+
+// ══════════════════════════════════════════
+//  PRINT
+// ══════════════════════════════════════════
+function openPrint(){
+  if(!goals.length){alert('No goals to print yet. Add your first goal!');return;}
+  document.getElementById('print-doc').innerHTML=buildPrintDoc();
+  document.getElementById('print-overlay').classList.add('open');
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+}
+
+function closePrint(){
+  document.getElementById('print-overlay').classList.remove('open');
+  renderHome();show('home');
+}
+
+function buildPrintDoc(){
+  const t=today();
+  const sorted=[...goals].sort((a,b)=>a.priority-b.priority);
+  const totalMs=goals.reduce((s,g)=>s+(g.milestones?.length||0),0);
+  const doneMs=goals.reduce((s,g)=>s+(g.milestones?.filter(m=>m.completed).length||0),0);
+
+  const header=`
+    <div class="print-doc-header">
+      <div class="print-doc-logo">★ North Star
+        <span>Personal Goal System</span>
+      </div>
+      <div class="print-doc-meta">
+        <strong>Printed ${fmtDateLong(t)}</strong>
+        ${sorted.length} goal${sorted.length!==1?'s':''} · ${totalMs} milestones
+        ${totalMs?`· ${doneMs}/${totalMs} complete`:''}
+      </div>
+    </div>`;
+
+  const goalBlocks=sorted.map((g,i)=>buildGoalBlock(g,t)).join('');
+
+  const footer=`
+    <div class="print-doc-footer">
+      ★ North Star — Focus on what moves you forward
+    </div>`;
+
+  return header+goalBlocks+footer;
+}
+
+function buildGoalBlock(g,t){
+  const milestones=g.milestones||[];
+  const tasks=g.tasksDate===t?(g.todaysTasks||[]):[];
+  const images=(g.images||[]).filter(i=>!i.isGenerated).slice(0,4);
+  const doneMs=milestones.filter(m=>m.completed).length;
+  const pct=milestones.length?Math.round(doneMs/milestones.length*100):0;
+
+  // Milestone rows
+  const msRows=milestones.length?`
+    <div class="print-section-heading">Milestones</div>
+    <table class="print-ms-table">
+      ${milestones.map(m=>`
+        <tr>
+          <td class="ms-col-check ${m.completed?'done':''}">${m.completed?'✓':'○'}</td>
+          <td class="ms-col-text ${m.completed?'done-text':''}">${esc(m.text)}</td>
+          <td class="ms-col-date">${m.targetDate?fmtDateLong(m.targetDate):''}</td>
+        </tr>`).join('')}
+    </table>
+    ${milestones.length?`
+      <div style="display:flex;align-items:center;gap:10px;margin-top:10px;">
+        <div class="ms-progress" style="flex:1;"><div class="ms-progress-fill" style="width:${pct}%"></div></div>
+        <span style="font-size:11px;color:#aaa;font-family:-apple-system,sans-serif;white-space:nowrap;">${doneMs} / ${milestones.length} done</span>
+      </div>`:''}
+  `:'' ;
+
+  // Today's tasks
+  const taskRows=tasks.filter(tk=>tk.text).length?`
+    <div class="print-section-heading">Today's Tasks</div>
+    ${tasks.filter(tk=>tk.text).map(tk=>`
+      <div class="print-task-row">
+        <span class="print-task-box ${tk.completed?'done':''}">${tk.completed?'✓':'☐'}</span>
+        <span class="print-task-label ${tk.completed?'done':''}">${esc(tk.text)}</span>
+        ${tk.assignee?`<span class="print-task-assignee">👤 ${esc(tk.assignee.name)}</span>`:''}
+      </div>`).join('')}
+  `:'';
+
+  // Vision images (uploaded only, not AI-generated)
+  const imgRow=images.length?`
+    <div class="print-section-heading">Vision</div>
+    <div class="print-images-row">
+      ${images.map(img=>`<img class="print-vision-img" src="${img.src||img.dataUrl}" alt="" onerror="this.style.display='none'">`).join('')}
+    </div>
+  `:'';
+
+  // Notes lines
+  const notesLines=`
+    <div class="print-section-heading">Notes</div>
+    ${Array(4).fill('<div class="print-note-line"></div>').join('')}
+  `;
+
+  return `
+    <div class="print-goal-block">
+      <div class="print-goal-meta">
+        <span class="print-priority-badge">Priority ${g.priority}</span>
+        ${g.createdAt?`<span class="print-goal-date">Added ${fmtDateLong(g.createdAt)}</span>`:''}
+      </div>
+      <div class="print-goal-statement">${esc(g.refinedGoal)}</div>
+      ${imgRow}
+      ${msRows}
+      ${taskRows}
+      ${notesLines}
+    </div>`;
+}
+
+init();
+</script>
+</body>
+</html>
