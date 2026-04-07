@@ -810,6 +810,7 @@ button.text-btn:hover { opacity:.65; }
 // ═══════════════════════════════════════════
 let goals = [];
 let activeGoalId = null;
+let sessionId = null;
 let shareBuffer = { msg:'', contact:'' };
 const R = { original:'', convo:[], qCount:0 };
 const MAX_TASKS = 5;
@@ -822,10 +823,154 @@ function uid()   { return Date.now().toString(36)+Math.random().toString(36).sli
 function today() { return new Date().toISOString().split('T')[0]; }
 
 // ═══════════════════════════════════════════
+//  SUPABASE DB LAYER  (fire-and-forget sync)
+// ═══════════════════════════════════════════
+async function dbFetch(action, method, params) {
+  const qs = new URLSearchParams({ action });
+  if (method === 'GET') Object.entries(params || {}).forEach(([k,v]) => v != null && qs.set(k, v));
+  const r = await fetch(`/api/db?${qs}`, {
+    method,
+    ...(method !== 'GET' ? { headers:{'Content-Type':'application/json'}, body:JSON.stringify(params||{}) } : {}),
+  });
+  if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.error || `DB ${r.status}`); }
+  return r.json();
+}
+
+async function dbSaveSession(sid) {
+  try { await dbFetch('saveSession','POST',{session_id:sid}); } catch(e){/*ignore*/}
+}
+
+async function dbSaveGoal(g) {
+  try {
+    const eoy = `${new Date().getFullYear()}-12-31`;
+    const data = await dbFetch('saveGoal','POST',{
+      session_id:sessionId, goal_id:g.dbId||undefined,
+      original_goal:g.originalGoal, refined_goal:g.refinedGoal, target_date:eoy,
+    });
+    const row = Array.isArray(data) ? data[0] : data;
+    if (row?.id) patch(g.id,{dbId:row.id});
+  } catch(e){ console.warn('[db] saveGoal:',e.message); }
+}
+
+async function dbSaveMilestones(g) {
+  if (!g.dbId) return;
+  try {
+    const ms = (g.milestones||[]).map(m=>({
+      db_id: m.dbId||null, title:m.text,
+      target_date:m.targetDate||null,
+      status: m.completed?'done':'not_started',
+    }));
+    const resp = await dbFetch('saveMilestones','POST',{session_id:sessionId, goal_id:g.dbId, milestones:ms});
+    const saved = resp.milestones||[];
+    const updated = (g.milestones||[]).map((m,i)=> saved[i]?.id ? {...m, dbId:saved[i].id} : m);
+    patch(g.id,{milestones:updated});
+  } catch(e){ console.warn('[db] saveMilestones:',e.message); }
+}
+
+async function dbSaveTasks(g, alignment) {
+  try {
+    const tasks = (g.todaysTasks||[]).slice(0,3).map(t=>({text:t.text, done:t.completed||false}));
+    const nextMs = (g.milestones||[]).find(m=>!m.completed);
+    const resp = await dbFetch('saveTasks','POST',{
+      session_id:sessionId, date:today(),
+      milestone_id: nextMs?.dbId||null,
+      tasks, alignment_feedback:alignment||null,
+      task_db_id: g.taskDbId||null,
+    });
+    if (resp?.id) patch(g.id,{taskDbId:resp.id});
+  } catch(e){ console.warn('[db] saveTasks:',e.message); }
+}
+
+async function dbMarkDone(g, taskIndex, done) {
+  if (!g.taskDbId) return;
+  try { await dbFetch('markDone','POST',{task_db_id:g.taskDbId, task_index:taskIndex+1, done}); }
+  catch(e){ console.warn('[db] markDone:',e.message); }
+}
+
+async function dbLoadAll() {
+  if (!sessionId) return;
+  try {
+    const [gr, mr, tr] = await Promise.all([
+      dbFetch('getGoal','GET',{session_id:sessionId}),
+      dbFetch('getMilestones','GET',{session_id:sessionId}),
+      dbFetch('getTasks','GET',{session_id:sessionId, date:today()}),
+    ]);
+    const dbGoals = gr.goals||[], dbMs = mr.milestones||[], dbTasks = tr.tasks||[];
+    let changed = false;
+
+    dbGoals.forEach(dg => {
+      const local = goals.find(g=>g.dbId===dg.id);
+      if (!local) {
+        // Restore goal missing from localStorage
+        const msList = dbMs.filter(m=>m.goal_id===dg.id);
+        const tRow   = dbTasks.find(t=>t.session_id===sessionId);
+        const restored = {
+          id:uid(), dbId:dg.id,
+          originalGoal:dg.original_goal, refinedGoal:dg.refined_goal,
+          priority:goals.length+1,
+          milestones: msList.map(m=>({id:uid(),dbId:m.id,text:m.title,targetDate:m.target_date||'',completed:m.status==='done'})),
+          images:[],userContext:'',resChat:[],resPhase:0,
+          todaysTasks: tRow ? [
+            {text:tRow.task_1||'',completed:tRow.done_1||false,assignee:null},
+            {text:tRow.task_2||'',completed:tRow.done_2||false,assignee:null},
+            {text:tRow.task_3||'',completed:tRow.done_3||false,assignee:null},
+          ].filter(t=>t.text) : [],
+          tasksDate: tRow?.date||'', taskDbId:tRow?.id||null,
+          createdAt:dg.created_at?.split('T')[0]||today(),
+        };
+        goals.push(restored); changed=true;
+      } else {
+        // Sync milestone status + task completion from DB
+        const msList = dbMs.filter(m=>m.goal_id===dg.id);
+        let msChanged=false;
+        const updatedMs = (local.milestones||[]).map(m=>{
+          const dbM = msList.find(d=>d.id===m.dbId);
+          if(dbM && dbM.status==='done' && !m.completed){msChanged=true;return{...m,completed:true};}
+          return m;
+        });
+        const tRow = dbTasks.find(t=>t.session_id===sessionId);
+        let tasksChanged=false, updatedTasks=local.todaysTasks||[];
+        if(tRow && local.tasksDate===today()){
+          updatedTasks=(local.todaysTasks||[]).map((t,i)=>{
+            const dbDone=[tRow.done_1,tRow.done_2,tRow.done_3][i];
+            if(dbDone!==undefined && dbDone!==t.completed){tasksChanged=true;return{...t,completed:dbDone};}
+            return t;
+          });
+        }
+        if(msChanged||tasksChanged){
+          patch(local.id,{milestones:updatedMs,todaysTasks:updatedTasks});
+          changed=true;
+        }
+      }
+    });
+
+    if(changed){save();renderHome();}
+  } catch(e){ console.warn('[db] loadAll:',e.message); }
+}
+
+function checkMilestoneAutoComplete(gid) {
+  const g=get(gid); if(!g)return;
+  if(g.tasksDate!==today())return;
+  const tasks=(g.todaysTasks||[]).filter(t=>t.text);
+  if(!tasks.length||!tasks.every(t=>t.completed))return;
+  const nextMs=(g.milestones||[]).find(m=>!m.completed);
+  if(!nextMs)return;
+  patch(gid,{milestones:g.milestones.map(m=>m.id===nextMs.id?{...m,completed:true}:m)});
+  dbSaveMilestones(get(gid));
+  renderMilestones(get(gid));
+  renderHome();
+}
+
+// ═══════════════════════════════════════════
 //  BOOT
 // ═══════════════════════════════════════════
 function init(){
   load();
+  // Session ID — stable identifier stored in localStorage
+  sessionId = localStorage.getItem('ns_session_id');
+  if(!sessionId){ sessionId=uid(); localStorage.setItem('ns_session_id',sessionId); }
+  dbSaveSession(sessionId);
+  dbLoadAll(); // async: restores cloud data in background
   renderHome(); show('home');
   on('goal-input',    'keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();submitGoal();}});
   on('refine-answer', 'keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();submitAnswer();}});
@@ -1074,6 +1219,8 @@ function confirmGoal(){
     refinementConvo:R.convo||[],createdAt:today()};
   goals.push(g);save();
   activeGoalId=g.id;renderGoalDetail(g.id);show('goal');
+  // Save goal to DB first, then auto-suggest milestones (needs dbId)
+  dbSaveGoal(g).then(()=>aiMilestones());
 }
 
 // ═══════════════════════════════════════════
@@ -1456,6 +1603,7 @@ Return ONLY a valid JSON array:
     const items=JSON.parse(jm[0]);
     patch(g.id,{milestones:[...(g.milestones||[]),...items.map(x=>({id:uid(),text:x.text,targetDate:x.targetDate||'',completed:false}))]});
     renderMilestones(get(g.id));
+    dbSaveMilestones(get(g.id));
   }catch(e){alert('Could not generate milestones: '+e.message);}
   finally{btn.disabled=false;btn.textContent='✦ Suggest with AI';}
 }
@@ -1466,13 +1614,17 @@ function addMilestone(){
   const g=get(activeGoalId);if(!g)return;
   patch(g.id,{milestones:[...(g.milestones||[]),{id:uid(),text,targetDate:date,completed:false}]});
   document.getElementById('new-ms-text').value='';document.getElementById('new-ms-date').value='';
-  renderMilestones(get(activeGoalId));
+  const updated=get(activeGoalId);
+  renderMilestones(updated);
+  dbSaveMilestones(updated);
 }
 
 function toggleMs(gid,mid){
   const g=get(gid);if(!g)return;
   patch(gid,{milestones:g.milestones.map(m=>m.id===mid?{...m,completed:!m.completed}:m)});
-  renderMilestones(get(gid));
+  const updated=get(gid);
+  renderMilestones(updated);
+  dbSaveMilestones(updated);
 }
 function removeMs(gid,mid){
   const g=get(gid);if(!g)return;
@@ -1552,9 +1704,10 @@ function removeTaskRow(i){
 function toggleTaskCheck(i){
   if(!taskRows[i].text)return;
   taskRows[i].completed=!taskRows[i].completed;
-  // Save immediately
   const g=get(activeGoalId);if(!g)return;
   patch(activeGoalId,{todaysTasks:[...taskRows]});
+  dbMarkDone(get(activeGoalId),i,taskRows[i].completed);
+  checkMilestoneAutoComplete(activeGoalId);
   // Update circle
   const circle=document.getElementById(`tcc-${i}`);
   const input=document.getElementById(`gd-t${i}`);
@@ -1677,6 +1830,7 @@ Write a 2–3 sentence honest assessment. Affirm if connected; gently note if of
 End with one short encouraging line. Warm, specific, no generic fluff.`;
   try{
     const alignment=await ai([{role:'user',content:'Assess alignment.'}],sys,320);
+    dbSaveTasks(get(activeGoalId), alignment);
     document.getElementById('done-goal').textContent=g.refinedGoal;
     document.getElementById('done-alignment').textContent=alignment;
     renderDoneTasks();
@@ -1705,6 +1859,8 @@ function toggleDoneCheck(i){
   tasks[i]={...tasks[i],completed:!tasks[i].completed};
   patch(activeGoalId,{todaysTasks:tasks});
   taskRows=tasks;
+  dbMarkDone(g,i,tasks[i].completed);
+  checkMilestoneAutoComplete(activeGoalId);
   const dc=document.getElementById(`dc-${i}`);
   const dt=document.getElementById(`dt-${i}`);
   if(dc)dc.classList.toggle('checked',tasks[i].completed);
