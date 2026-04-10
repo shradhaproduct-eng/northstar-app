@@ -1343,6 +1343,7 @@ function signOut(){
   localStorage.removeItem('ns_goals');
   localStorage.removeItem('ns_session_id');
   goals=[];
+  document.getElementById('continue-btn')?.remove();
   showLanding();
 }
 
@@ -1390,6 +1391,7 @@ function init(){
     const lp=document.getElementById('landing');
     if(lp){
       const cont=document.createElement('div');
+      cont.id='continue-btn';
       cont.style.cssText='position:fixed;bottom:28px;right:28px;z-index:50;';
       cont.innerHTML='<button onclick="startApp()" style="background:#1A1A1A;color:#fff;font-family:var(--fb);font-size:13px;font-weight:500;padding:10px 20px;border-radius:20px;border:none;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,.15);">Continue to my goals →</button>';
       document.body.appendChild(cont);
