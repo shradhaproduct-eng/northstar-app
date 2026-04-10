@@ -1,18 +1,20 @@
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
-function sb(path, opts = {}) {
+function sb(path, opts = {}, userToken) {
   const base = process.env.SUPABASE_URL.trim();
   const key  = process.env.SUPABASE_ANON_KEY.trim();
   const { prefer, method = 'GET', body } = opts;
+  // Use user's JWT if provided (enables RLS per-user scoping), else fall back to anon key
+  const authHeader = userToken ? `Bearer ${userToken}` : `Bearer ${key}`;
   return fetch(`${base}/rest/v1${path}`, {
     method,
     headers: {
       'apikey': key,
-      'Authorization': `Bearer ${key}`,
+      'Authorization': authHeader,
       'Content-Type': 'application/json',
       'Prefer': prefer || 'return=representation',
     },
@@ -32,6 +34,9 @@ export default async function handler(req, res) {
     res.end(JSON.stringify({ error: 'SUPABASE_URL and SUPABASE_ANON_KEY env vars are not set' }));
     return;
   }
+
+  // Extract user JWT from Authorization header (sent by authenticated frontend)
+  const userToken = (req.headers['authorization'] || '').replace(/^Bearer\s+/i, '') || null;
 
   const urlObj = new URL(req.url, 'http://localhost');
   const action = urlObj.searchParams.get('action');
@@ -55,7 +60,7 @@ export default async function handler(req, res) {
         method: 'POST',
         prefer: 'resolution=ignore-duplicates,return=representation',
         body: { session_id },
-      });
+      }, userToken);
       const data = await r.json();
       res.writeHead(r.ok ? 200 : 400, { ...CORS_HEADERS, 'Content-Type': 'application/json' });
       res.end(JSON.stringify(data));
@@ -68,9 +73,9 @@ export default async function handler(req, res) {
       const payload = { session_id, original_goal, refined_goal, target_date };
       let r;
       if (goal_id) {
-        r = await sb(`/goals?id=eq.${goal_id}`, { method: 'PATCH', body: payload });
+        r = await sb(`/goals?id=eq.${goal_id}`, { method: 'PATCH', body: payload }, userToken);
       } else {
-        r = await sb('/goals', { method: 'POST', body: payload });
+        r = await sb('/goals', { method: 'POST', body: payload }, userToken);
       }
       const data = await r.json();
       res.writeHead(r.ok ? 200 : 400, { ...CORS_HEADERS, 'Content-Type': 'application/json' });
@@ -88,7 +93,7 @@ export default async function handler(req, res) {
           r = await sb(`/milestones?id=eq.${ms.db_id}`, {
             method: 'PATCH',
             body: { title: ms.title, target_date: ms.target_date || null, status: ms.status },
-          });
+          }, userToken);
         } else {
           r = await sb('/milestones', {
             method: 'POST',
@@ -99,7 +104,7 @@ export default async function handler(req, res) {
               target_date: ms.target_date || null,
               status: ms.status || 'not_started',
             },
-          });
+          }, userToken);
         }
         const data = await r.json();
         results.push(Array.isArray(data) ? data[0] : data);
@@ -126,9 +131,9 @@ export default async function handler(req, res) {
       };
       let r;
       if (task_db_id) {
-        r = await sb(`/daily_tasks?id=eq.${task_db_id}`, { method: 'PATCH', body: payload });
+        r = await sb(`/daily_tasks?id=eq.${task_db_id}`, { method: 'PATCH', body: payload }, userToken);
       } else {
-        r = await sb('/daily_tasks', { method: 'POST', body: payload });
+        r = await sb('/daily_tasks', { method: 'POST', body: payload }, userToken);
       }
       const data = await r.json();
       res.writeHead(r.ok ? 200 : 400, { ...CORS_HEADERS, 'Content-Type': 'application/json' });
@@ -142,7 +147,7 @@ export default async function handler(req, res) {
       const r = await sb(`/daily_tasks?id=eq.${task_db_id}`, {
         method: 'PATCH',
         body: { [`done_${task_index}`]: done },
-      });
+      }, userToken);
       const data = await r.json();
       res.writeHead(r.ok ? 200 : 400, { ...CORS_HEADERS, 'Content-Type': 'application/json' });
       res.end(JSON.stringify(data));
@@ -152,7 +157,7 @@ export default async function handler(req, res) {
     // ── GET getGoal ───────────────────────────────────────────
     if (action === 'getGoal' && req.method === 'GET') {
       const session_id = urlObj.searchParams.get('session_id');
-      const r = await sb(`/goals?session_id=eq.${encodeURIComponent(session_id)}&order=created_at.asc`);
+      const r = await sb(`/goals?session_id=eq.${encodeURIComponent(session_id)}&order=created_at.asc`, {}, userToken);
       const data = await r.json();
       res.writeHead(r.ok ? 200 : 400, { ...CORS_HEADERS, 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ goals: Array.isArray(data) ? data : [] }));
@@ -165,7 +170,7 @@ export default async function handler(req, res) {
       const goal_id    = urlObj.searchParams.get('goal_id');
       let path = `/milestones?session_id=eq.${encodeURIComponent(session_id)}&order=created_at.asc`;
       if (goal_id) path += `&goal_id=eq.${encodeURIComponent(goal_id)}`;
-      const r = await sb(path);
+      const r = await sb(path, {}, userToken);
       const data = await r.json();
       res.writeHead(r.ok ? 200 : 400, { ...CORS_HEADERS, 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ milestones: Array.isArray(data) ? data : [] }));
@@ -178,7 +183,7 @@ export default async function handler(req, res) {
       const date       = urlObj.searchParams.get('date');
       let path = `/daily_tasks?session_id=eq.${encodeURIComponent(session_id)}&order=created_at.asc`;
       if (date) path += `&date=eq.${date}`;
-      const r = await sb(path);
+      const r = await sb(path, {}, userToken);
       const data = await r.json();
       res.writeHead(r.ok ? 200 : 400, { ...CORS_HEADERS, 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ tasks: Array.isArray(data) ? data : [] }));

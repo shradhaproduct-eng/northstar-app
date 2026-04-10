@@ -840,7 +840,23 @@ button.text-btn:hover { opacity:.7; transform:none; }
   <div id="notif-perm-box"></div>
 </div>
 
-<!-- API key screen removed — key lives in server env var -->
+<!-- ═══ AUTH ═══ -->
+<div class="screen" id="screen-auth">
+  <div class="nav">
+    <div class="logo">★ North Star</div>
+  </div>
+  <div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding-bottom:40px;">
+    <h1 style="font-size:28px;font-weight:300;margin-bottom:10px;">Your goals,<br>just for you.</h1>
+    <p class="subtitle" style="margin-bottom:32px;">We use your email so your goals are private and only accessible to you — never anonymous, never shared.</p>
+    <div class="ns-card" style="padding:28px;">
+      <label style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);display:block;margin-bottom:10px;">Your email</label>
+      <input type="email" id="auth-email" placeholder="you@example.com" autocomplete="email" />
+      <button id="auth-btn" onclick="sendMagicLink()" style="margin-top:16px;">Send magic link →</button>
+      <p id="auth-msg" style="font-size:13px;color:var(--muted);text-align:center;margin-top:14px;min-height:18px;line-height:1.5;"></p>
+    </div>
+    <p style="font-size:12px;color:var(--hint);text-align:center;margin-top:20px;line-height:1.6;">We'll email you a one-click sign-in link.<br>No password needed.</p>
+  </div>
+</div>
 
 <!-- ═══ HOME ═══ -->
 <div class="screen" id="screen-home">
@@ -852,6 +868,7 @@ button.text-btn:hover { opacity:.7; transform:none; }
         <div class="bell-icon">🔔</div>
         <div class="bell-badge" id="bell-badge"></div>
       </div>
+      <button class="ghost sm" onclick="signOut()" style="margin-top:0;font-size:11px;padding:5px 10px;color:var(--muted);">Sign out</button>
     </div>
   </div>
 
@@ -1097,6 +1114,7 @@ button.text-btn:hover { opacity:.7; transform:none; }
 let goals = [];
 let activeGoalId = null;
 let sessionId = null;
+let authSession = null; // { access_token, refresh_token, user_id }
 let shareBuffer = { msg:'', contact:'' };
 const R = { original:'', convo:[], qCount:0 };
 const MAX_TASKS = 5;
@@ -1114,9 +1132,12 @@ function today() { return new Date().toISOString().split('T')[0]; }
 async function dbFetch(action, method, params) {
   const qs = new URLSearchParams({ action });
   if (method === 'GET') Object.entries(params || {}).forEach(([k,v]) => v != null && qs.set(k, v));
+  const headers = { 'Content-Type': 'application/json' };
+  if (authSession?.access_token) headers['Authorization'] = `Bearer ${authSession.access_token}`;
   const r = await fetch(`/api/db?${qs}`, {
     method,
-    ...(method !== 'GET' ? { headers:{'Content-Type':'application/json'}, body:JSON.stringify(params||{}) } : {}),
+    headers,
+    ...(method !== 'GET' ? { body: JSON.stringify(params||{}) } : {}),
   });
   if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.error || `DB ${r.status}`); }
   return r.json();
@@ -1248,28 +1269,113 @@ function checkMilestoneAutoComplete(gid) {
 }
 
 // ═══════════════════════════════════════════
+//  AUTH
+// ═══════════════════════════════════════════
+function getUserIdFromJWT(token){
+  try{ return JSON.parse(atob(token.split('.')[1])).sub; }catch{ return null; }
+}
+
+function loadAuthSession(){
+  try{
+    const s=localStorage.getItem('ns_auth');
+    if(s){ authSession=JSON.parse(s); return true; }
+  }catch{}
+  return false;
+}
+
+function checkAuthCallback(){
+  // Supabase magic link puts tokens in URL hash: #access_token=...&type=magiclink
+  const hash=window.location.hash.slice(1);
+  if(!hash) return false;
+  const p=new URLSearchParams(hash);
+  const access_token=p.get('access_token');
+  const refresh_token=p.get('refresh_token');
+  const type=p.get('type');
+  if(access_token && (type==='magiclink'||type==='signup'||type==='recovery')){
+    const user_id=getUserIdFromJWT(access_token);
+    authSession={ access_token, refresh_token, user_id };
+    localStorage.setItem('ns_auth', JSON.stringify(authSession));
+    history.replaceState(null,'',window.location.pathname);
+    return true;
+  }
+  return false;
+}
+
+async function sendMagicLink(){
+  const email=document.getElementById('auth-email').value.trim();
+  const msg=document.getElementById('auth-msg');
+  const btn=document.getElementById('auth-btn');
+  if(!email){ msg.textContent='Please enter your email.'; msg.style.color='var(--red)'; return; }
+  btn.disabled=true; btn.textContent='Sending…';
+  msg.textContent=''; msg.style.color='var(--muted)';
+  try{
+    const redirectTo=window.location.origin+window.location.pathname;
+    const r=await fetch('/api/auth?action=sendMagicLink',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({email, redirectTo}),
+    });
+    if(!r.ok) throw new Error('Could not send link. Try again.');
+    msg.textContent='✓ Magic link sent — check your inbox (and spam folder).';
+    msg.style.color='var(--green)';
+  }catch(e){
+    msg.textContent=e.message;
+    msg.style.color='var(--red)';
+  }finally{
+    btn.disabled=false; btn.textContent='Send magic link →';
+  }
+}
+
+function signOut(){
+  authSession=null;
+  localStorage.removeItem('ns_auth');
+  localStorage.removeItem('ns_goals');
+  localStorage.removeItem('ns_session_id');
+  goals=[];
+  showLanding();
+}
+
+// ═══════════════════════════════════════════
 //  BOOT
 // ═══════════════════════════════════════════
 function init(){
-  load();
-  // Session ID — stable identifier stored in localStorage
-  sessionId = localStorage.getItem('ns_session_id');
-  if(!sessionId){ sessionId=uid(); localStorage.setItem('ns_session_id',sessionId); }
-  dbSaveSession(sessionId);
-  dbLoadAll(); // async: restores cloud data in background
-  // Always show landing first; add continue link for returning users
-  if(goals.length > 0){
-    const lp = document.getElementById('landing');
-    if(lp){
-      const cont = document.createElement('div');
-      cont.style.cssText = 'position:fixed;bottom:28px;right:28px;z-index:50;';
-      cont.innerHTML = '<button onclick="startApp()" style="background:#1A1A1A;color:#fff;font-family:var(--fb);font-size:13px;font-weight:500;padding:10px 20px;border-radius:20px;border:none;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,.15);">Continue to my goals →</button>';
-      document.body.appendChild(cont);
-    }
-  }
+  // 1. Check for magic link callback in URL hash
+  const fromMagicLink = checkAuthCallback();
+
+  // 2. Load stored session if not just redirected
+  if(!fromMagicLink) loadAuthSession();
+
+  // 3. Wire keyboard shortcuts
   on('goal-input',    'keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();submitGoal();}});
   on('refine-answer', 'keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();submitAnswer();}});
   on('res-input',     'keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendResourceMsg();}});
+
+  // 4. Gate on auth
+  if(!authSession){
+    // Not signed in — show landing, CTAs will route to auth screen
+    showLanding();
+    return;
+  }
+
+  // 5. Authenticated — use auth user_id as session identity
+  sessionId = authSession.user_id || getUserIdFromJWT(authSession.access_token);
+  localStorage.setItem('ns_session_id', sessionId);
+
+  load();
+  dbSaveSession(sessionId);
+  dbLoadAll();
+
+  // Always show landing first; returning users get a floating continue button
+  if(goals.length > 0){
+    const lp=document.getElementById('landing');
+    if(lp){
+      const cont=document.createElement('div');
+      cont.style.cssText='position:fixed;bottom:28px;right:28px;z-index:50;';
+      cont.innerHTML='<button onclick="startApp()" style="background:#1A1A1A;color:#fff;font-family:var(--fb);font-size:13px;font-weight:500;padding:10px 20px;border-radius:20px;border:none;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,.15);">Continue to my goals →</button>';
+      document.body.appendChild(cont);
+    }
+  }
+
   scheduleCheckins();
 }
 function on(id,ev,fn){document.getElementById(id).addEventListener(ev,fn);}
@@ -1288,6 +1394,11 @@ function showLanding(){
 }
 function startApp(){
   hideLanding();
+  if(!authSession){
+    show('auth');
+    setTimeout(()=>document.getElementById('auth-email')?.focus(), 100);
+    return;
+  }
   renderHome(); show('home');
 }
 
