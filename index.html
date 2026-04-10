@@ -1284,21 +1284,32 @@ function loadAuthSession(){
 }
 
 function checkAuthCallback(){
-  // Supabase magic link puts tokens in URL hash: #access_token=...&type=magiclink
+  // Supabase magic link puts tokens (or errors) in URL hash
   const hash=window.location.hash.slice(1);
-  if(!hash) return false;
+  if(!hash) return null;
   const p=new URLSearchParams(hash);
   const access_token=p.get('access_token');
   const refresh_token=p.get('refresh_token');
   const type=p.get('type');
+  const error=p.get('error');
+  const error_description=p.get('error_description');
+
+  // Always clear the hash from URL
+  history.replaceState(null,'',window.location.pathname);
+
   if(access_token && (type==='magiclink'||type==='signup'||type==='recovery')){
     const user_id=getUserIdFromJWT(access_token);
     authSession={ access_token, refresh_token, user_id };
     localStorage.setItem('ns_auth', JSON.stringify(authSession));
-    history.replaceState(null,'',window.location.pathname);
-    return true;
+    return 'success';
   }
-  return false;
+  if(error){
+    const msg = error_description
+      ? decodeURIComponent(error_description).replace(/\+/g,' ')
+      : 'Link expired or invalid. Please request a new one.';
+    return { error: msg };
+  }
+  return null;
 }
 
 async function sendMagicLink(){
@@ -1340,17 +1351,26 @@ function signOut(){
 // ═══════════════════════════════════════════
 function init(){
   // 1. Check for magic link callback in URL hash
-  const fromMagicLink = checkAuthCallback();
+  const callbackResult = checkAuthCallback();
 
-  // 2. Load stored session if not just redirected
-  if(!fromMagicLink) loadAuthSession();
+  // 2. Load stored session if not a callback
+  if(!callbackResult) loadAuthSession();
 
   // 3. Wire keyboard shortcuts
   on('goal-input',    'keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();submitGoal();}});
   on('refine-answer', 'keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();submitAnswer();}});
   on('res-input',     'keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendResourceMsg();}});
 
-  // 4. Gate on auth
+  // 4. Handle auth callback error — show auth screen with message
+  if(callbackResult?.error){
+    hideLanding();
+    show('auth');
+    const msgEl=document.getElementById('auth-msg');
+    if(msgEl){ msgEl.textContent=callbackResult.error; msgEl.style.color='var(--red)'; }
+    return;
+  }
+
+  // 5. Gate on auth
   if(!authSession){
     // Not signed in — show landing, CTAs will route to auth screen
     showLanding();
