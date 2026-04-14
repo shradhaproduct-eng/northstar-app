@@ -1,10 +1,10 @@
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
 
-function sbAuth(path, body) {
+function sbPost(path, body, token) {
   const base = process.env.SUPABASE_URL.trim();
   const key  = process.env.SUPABASE_ANON_KEY.trim();
   return fetch(`${base}/auth/v1${path}`, {
@@ -12,6 +12,21 @@ function sbAuth(path, body) {
     headers: {
       'apikey': key,
       'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+}
+
+function sbPut(path, body, token) {
+  const base = process.env.SUPABASE_URL.trim();
+  const key  = process.env.SUPABASE_ANON_KEY.trim();
+  return fetch(`${base}/auth/v1${path}`, {
+    method: 'PUT',
+    headers: {
+      'apikey': key,
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
     },
     body: JSON.stringify(body),
   });
@@ -38,6 +53,7 @@ export default async function handler(req, res) {
 
   const urlObj = new URL(req.url, 'http://localhost');
   const action = urlObj.searchParams.get('action');
+  const userToken = (req.headers['authorization'] || '').replace(/^Bearer\s+/i, '') || null;
 
   let body = {};
   try {
@@ -49,21 +65,91 @@ export default async function handler(req, res) {
   }
 
   try {
-    // ── POST sendMagicLink ────────────────────────────────────
-    if (action === 'sendMagicLink') {
+    // ── POST signUp ───────────────────────────────────────────
+    if (action === 'signUp') {
+      const { email, password } = body;
+      if (!email || !password) {
+        res.writeHead(400, { ...CORS_HEADERS, 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Email and password are required' }));
+        return;
+      }
+      const r = await sbPost('/signup', { email, password });
+      const data = await r.json();
+      if (!r.ok) {
+        res.writeHead(400, { ...CORS_HEADERS, 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: data.msg || data.message || 'Sign up failed' }));
+        return;
+      }
+      res.writeHead(200, { ...CORS_HEADERS, 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+        user_id: data.user?.id,
+      }));
+      return;
+    }
+
+    // ── POST signIn ───────────────────────────────────────────
+    if (action === 'signIn') {
+      const { email, password } = body;
+      if (!email || !password) {
+        res.writeHead(400, { ...CORS_HEADERS, 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Email and password are required' }));
+        return;
+      }
+      const r = await sbPost('/token?grant_type=password', { email, password });
+      const data = await r.json();
+      if (!r.ok) {
+        res.writeHead(400, { ...CORS_HEADERS, 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: data.error_description || data.msg || 'Invalid email or password' }));
+        return;
+      }
+      res.writeHead(200, { ...CORS_HEADERS, 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+        user_id: data.user?.id,
+      }));
+      return;
+    }
+
+    // ── POST forgotPassword ───────────────────────────────────
+    if (action === 'forgotPassword') {
       const { email, redirectTo } = body;
       if (!email) {
         res.writeHead(400, { ...CORS_HEADERS, 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'email is required' }));
+        res.end(JSON.stringify({ error: 'Email is required' }));
         return;
       }
-      const r = await sbAuth('/magiclink', {
-        email,
-        ...(redirectTo ? { options: { redirectTo } } : {}),
-      });
-      // Supabase returns 204 No Content on success
-      res.writeHead(r.ok ? 200 : 400, { ...CORS_HEADERS, 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(r.ok ? { ok: true } : { error: 'Failed to send magic link' }));
+      const r = await sbPost('/recover', { email, ...(redirectTo ? { redirectTo } : {}) });
+      res.writeHead(200, { ...CORS_HEADERS, 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true })); // always 200 to avoid email enumeration
+      return;
+    }
+
+    // ── POST resetPassword ────────────────────────────────────
+    // Requires Authorization: Bearer {recovery_token}
+    if (action === 'resetPassword') {
+      const { password } = body;
+      if (!password) {
+        res.writeHead(400, { ...CORS_HEADERS, 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Password is required' }));
+        return;
+      }
+      if (!userToken) {
+        res.writeHead(401, { ...CORS_HEADERS, 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'No auth token provided' }));
+        return;
+      }
+      const r = await sbPut('/user', { password }, userToken);
+      const data = await r.json();
+      if (!r.ok) {
+        res.writeHead(400, { ...CORS_HEADERS, 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: data.msg || data.message || 'Password reset failed' }));
+        return;
+      }
+      res.writeHead(200, { ...CORS_HEADERS, 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true }));
       return;
     }
 

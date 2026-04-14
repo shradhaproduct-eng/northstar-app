@@ -842,19 +842,57 @@ button.text-btn:hover { opacity:.7; transform:none; }
 
 <!-- ═══ AUTH ═══ -->
 <div class="screen" id="screen-auth">
-  <div class="nav">
-    <div class="logo">★ North Star</div>
-  </div>
-  <div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding-bottom:40px;">
-    <h1 style="font-size:28px;font-weight:300;margin-bottom:10px;">Your goals,<br>just for you.</h1>
-    <p class="subtitle" style="margin-bottom:32px;">We use your email so your goals are private and only accessible to you — never anonymous, never shared.</p>
-    <div class="ns-card" style="padding:28px;">
-      <label style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);display:block;margin-bottom:10px;">Your email</label>
-      <input type="email" id="auth-email" placeholder="you@example.com" autocomplete="email" />
-      <button id="auth-btn" onclick="sendMagicLink()" style="margin-top:16px;">Send magic link →</button>
-      <p id="auth-msg" style="font-size:13px;color:var(--muted);text-align:center;margin-top:14px;min-height:18px;line-height:1.5;"></p>
+  <div class="nav"><div class="logo">★ North Star</div></div>
+  <div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding-bottom:48px;">
+
+    <!-- Sign in / Sign up -->
+    <div id="auth-main-view">
+      <h1 style="font-size:28px;font-weight:300;margin-bottom:8px;" id="auth-heading">Welcome back</h1>
+      <p class="subtitle" style="margin-bottom:28px;">Your goals are private and only accessible to you.</p>
+      <div class="ns-card" style="padding:28px;">
+        <label style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);display:block;margin-bottom:8px;">Email</label>
+        <input type="email" id="auth-email" placeholder="you@example.com" autocomplete="email" />
+        <label style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);display:block;margin:14px 0 8px;">Password</label>
+        <input type="password" id="auth-password" placeholder="••••••••" autocomplete="current-password" />
+        <button id="auth-btn" onclick="authSubmit()" style="margin-top:18px;">Sign in</button>
+        <p id="auth-msg" style="font-size:13px;text-align:center;margin-top:12px;min-height:18px;line-height:1.5;color:var(--red);"></p>
+        <div style="text-align:center;margin-top:4px;">
+          <span onclick="showForgotView()" style="font-size:13px;color:var(--muted);cursor:pointer;text-decoration:underline;text-underline-offset:3px;">Forgot password?</span>
+        </div>
+      </div>
+      <p style="font-size:13px;color:var(--muted);text-align:center;margin-top:18px;">
+        <span id="auth-toggle-label">Don't have an account?</span>
+        <span onclick="toggleAuthMode()" style="color:var(--gold);cursor:pointer;font-weight:500;margin-left:4px;" id="auth-toggle-btn">Create one</span>
+      </p>
     </div>
-    <p style="font-size:12px;color:var(--hint);text-align:center;margin-top:20px;line-height:1.6;">We'll email you a one-click sign-in link.<br>No password needed.</p>
+
+    <!-- Forgot password -->
+    <div id="auth-forgot-view" style="display:none;">
+      <h1 style="font-size:28px;font-weight:300;margin-bottom:8px;">Reset password</h1>
+      <p class="subtitle" style="margin-bottom:28px;">Enter your email and we'll send a reset link.</p>
+      <div class="ns-card" style="padding:28px;">
+        <label style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);display:block;margin-bottom:8px;">Email</label>
+        <input type="email" id="forgot-email" placeholder="you@example.com" autocomplete="email" />
+        <button id="forgot-btn" onclick="sendForgot()" style="margin-top:18px;">Send reset link</button>
+        <p id="forgot-msg" style="font-size:13px;text-align:center;margin-top:12px;min-height:18px;line-height:1.5;"></p>
+      </div>
+      <p style="font-size:13px;color:var(--muted);text-align:center;margin-top:18px;">
+        <span onclick="showMainAuthView()" style="color:var(--gold);cursor:pointer;font-weight:500;">← Back to sign in</span>
+      </p>
+    </div>
+
+    <!-- Set new password (after clicking reset link) -->
+    <div id="auth-reset-view" style="display:none;">
+      <h1 style="font-size:28px;font-weight:300;margin-bottom:8px;">Set new password</h1>
+      <p class="subtitle" style="margin-bottom:28px;">Choose a new password for your account.</p>
+      <div class="ns-card" style="padding:28px;">
+        <label style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);display:block;margin-bottom:8px;">New password</label>
+        <input type="password" id="reset-password" placeholder="••••••••" autocomplete="new-password" />
+        <button id="reset-btn" onclick="submitReset()" style="margin-top:18px;">Set password</button>
+        <p id="reset-msg" style="font-size:13px;text-align:center;margin-top:12px;min-height:18px;line-height:1.5;"></p>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -1271,6 +1309,8 @@ function checkMilestoneAutoComplete(gid) {
 // ═══════════════════════════════════════════
 //  AUTH
 // ═══════════════════════════════════════════
+let authMode = 'signin'; // 'signin' | 'signup'
+
 function getUserIdFromJWT(token){
   try{ return JSON.parse(atob(token.split('.')[1])).sub; }catch{ return null; }
 }
@@ -1284,7 +1324,7 @@ function loadAuthSession(){
 }
 
 function checkAuthCallback(){
-  // Supabase magic link puts tokens (or errors) in URL hash
+  // Supabase password reset puts recovery token in URL hash
   const hash=window.location.hash.slice(1);
   if(!hash) return null;
   const p=new URLSearchParams(hash);
@@ -1293,47 +1333,131 @@ function checkAuthCallback(){
   const type=p.get('type');
   const error=p.get('error');
   const error_description=p.get('error_description');
-
-  // Always clear the hash from URL
   history.replaceState(null,'',window.location.pathname);
-
-  if(access_token && (type==='magiclink'||type==='signup'||type==='recovery')){
-    const user_id=getUserIdFromJWT(access_token);
-    authSession={ access_token, refresh_token, user_id };
+  if(access_token && type==='recovery'){
+    authSession={ access_token, refresh_token, user_id: getUserIdFromJWT(access_token) };
+    return 'recovery';
+  }
+  if(access_token){
+    authSession={ access_token, refresh_token, user_id: getUserIdFromJWT(access_token) };
     localStorage.setItem('ns_auth', JSON.stringify(authSession));
     return 'success';
   }
   if(error){
-    const msg = error_description
-      ? decodeURIComponent(error_description).replace(/\+/g,' ')
-      : 'Link expired or invalid. Please request a new one.';
+    const msg=error_description ? decodeURIComponent(error_description).replace(/\+/g,' ') : 'Link expired. Please try again.';
     return { error: msg };
   }
   return null;
 }
 
-async function sendMagicLink(){
+// ── Auth screen view helpers ──
+function showMainAuthView(){
+  document.getElementById('auth-main-view').style.display='';
+  document.getElementById('auth-forgot-view').style.display='none';
+  document.getElementById('auth-reset-view').style.display='none';
+}
+function showForgotView(){
+  document.getElementById('auth-main-view').style.display='none';
+  document.getElementById('auth-forgot-view').style.display='';
+  document.getElementById('auth-reset-view').style.display='none';
+  document.getElementById('forgot-email').value=document.getElementById('auth-email').value||'';
+  document.getElementById('forgot-msg').textContent='';
+}
+function showResetView(){
+  document.getElementById('auth-main-view').style.display='none';
+  document.getElementById('auth-forgot-view').style.display='none';
+  document.getElementById('auth-reset-view').style.display='';
+}
+function toggleAuthMode(){
+  authMode=authMode==='signin'?'signup':'signin';
+  const isSignup=authMode==='signup';
+  document.getElementById('auth-heading').textContent    = isSignup?'Create your account':'Welcome back';
+  document.getElementById('auth-btn').textContent        = isSignup?'Create account':'Sign in';
+  document.getElementById('auth-toggle-label').textContent = isSignup?'Already have an account?':"Don't have an account?";
+  document.getElementById('auth-toggle-btn').textContent   = isSignup?'Sign in':'Create one';
+  document.getElementById('auth-msg').textContent='';
+}
+
+// ── Sign in / Sign up ──
+async function authSubmit(){
   const email=document.getElementById('auth-email').value.trim();
+  const password=document.getElementById('auth-password').value;
   const msg=document.getElementById('auth-msg');
   const btn=document.getElementById('auth-btn');
-  if(!email){ msg.textContent='Please enter your email.'; msg.style.color='var(--red)'; return; }
-  btn.disabled=true; btn.textContent='Sending…';
-  msg.textContent=''; msg.style.color='var(--muted)';
+  msg.textContent='';
+  if(!email||!password){ msg.textContent='Please enter your email and password.'; return; }
+  btn.disabled=true; btn.textContent=authMode==='signup'?'Creating account…':'Signing in…';
   try{
-    const redirectTo=window.location.origin+window.location.pathname;
-    const r=await fetch('/api/auth?action=sendMagicLink',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({email, redirectTo}),
+    const action=authMode==='signup'?'signUp':'signIn';
+    const r=await fetch(`/api/auth?action=${action}`,{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({email,password}),
     });
-    if(!r.ok) throw new Error('Could not send link. Try again.');
-    msg.textContent='✓ Magic link sent — check your inbox (and spam folder).';
-    msg.style.color='var(--green)';
+    const data=await r.json();
+    if(!r.ok) throw new Error(data.error||'Something went wrong');
+    authSession={ access_token:data.access_token, refresh_token:data.refresh_token, user_id:data.user_id };
+    localStorage.setItem('ns_auth', JSON.stringify(authSession));
+    sessionId=authSession.user_id;
+    localStorage.setItem('ns_session_id', sessionId);
+    load(); dbSaveSession(sessionId); dbLoadAll();
+    hideLanding(); renderHome(); show('home');
+    scheduleCheckins();
   }catch(e){
     msg.textContent=e.message;
-    msg.style.color='var(--red)';
   }finally{
-    btn.disabled=false; btn.textContent='Send magic link →';
+    btn.disabled=false; btn.textContent=authMode==='signup'?'Create account':'Sign in';
+  }
+}
+
+// ── Forgot password ──
+async function sendForgot(){
+  const email=document.getElementById('forgot-email').value.trim();
+  const msg=document.getElementById('forgot-msg');
+  const btn=document.getElementById('forgot-btn');
+  msg.textContent=''; msg.style.color='var(--muted)';
+  if(!email){ msg.textContent='Please enter your email.'; msg.style.color='var(--red)'; return; }
+  btn.disabled=true; btn.textContent='Sending…';
+  try{
+    const redirectTo=window.location.origin+window.location.pathname;
+    await fetch('/api/auth?action=forgotPassword',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({email, redirectTo}),
+    });
+    msg.textContent='✓ If that email exists, a reset link is on its way.';
+    msg.style.color='var(--green)';
+  }catch{
+    msg.textContent='Something went wrong. Try again.'; msg.style.color='var(--red)';
+  }finally{
+    btn.disabled=false; btn.textContent='Send reset link';
+  }
+}
+
+// ── Reset password (after clicking reset link in email) ──
+async function submitReset(){
+  const password=document.getElementById('reset-password').value;
+  const msg=document.getElementById('reset-msg');
+  const btn=document.getElementById('reset-btn');
+  msg.textContent='';
+  if(!password||password.length<6){ msg.textContent='Password must be at least 6 characters.'; msg.style.color='var(--red)'; return; }
+  btn.disabled=true; btn.textContent='Setting password…';
+  try{
+    const r=await fetch('/api/auth?action=resetPassword',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':`Bearer ${authSession.access_token}`},
+      body:JSON.stringify({password}),
+    });
+    const data=await r.json();
+    if(!r.ok) throw new Error(data.error||'Reset failed');
+    localStorage.setItem('ns_auth', JSON.stringify(authSession));
+    sessionId=authSession.user_id;
+    localStorage.setItem('ns_session_id', sessionId);
+    load(); dbSaveSession(sessionId); dbLoadAll();
+    hideLanding(); renderHome(); show('home');
+    scheduleCheckins();
+  }catch(e){
+    msg.textContent=e.message; msg.style.color='var(--red)';
+  }finally{
+    btn.disabled=false; btn.textContent='Set password';
   }
 }
 
@@ -1361,13 +1485,19 @@ function init(){
   on('goal-input',    'keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();submitGoal();}});
   on('refine-answer', 'keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();submitAnswer();}});
   on('res-input',     'keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendResourceMsg();}});
+  on('auth-password', 'keydown',e=>{if(e.key==='Enter'){e.preventDefault();authSubmit();}});
+  on('forgot-email',  'keydown',e=>{if(e.key==='Enter'){e.preventDefault();sendForgot();}});
+  on('reset-password','keydown',e=>{if(e.key==='Enter'){e.preventDefault();submitReset();}});
 
-  // 4. Handle auth callback error — show auth screen with message
+  // 4. Handle auth callback results
+  if(callbackResult==='recovery'){
+    hideLanding(); show('auth'); showResetView();
+    return;
+  }
   if(callbackResult?.error){
-    hideLanding();
-    show('auth');
+    hideLanding(); show('auth');
     const msgEl=document.getElementById('auth-msg');
-    if(msgEl){ msgEl.textContent=callbackResult.error; msgEl.style.color='var(--red)'; }
+    if(msgEl){ msgEl.textContent=callbackResult.error; }
     return;
   }
 
